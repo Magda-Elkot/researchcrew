@@ -42,3 +42,18 @@
 - Don't run git commit, git push or destructive commands (rm -rf, docker system prune).
   I review and commit myself.
 - Don't modify files outside this project folder.
+
+## Learning mode (important)
+- I run the commands myself. Don't run shell commands for me unless I ask.
+  This includes uv, docker, pytest, ruff, make and git.
+- When a command is needed, show it in a code block and explain:
+  1. what it does, 2. what each part/flag means, 3. what output I should expect.
+- After I run it, I'll paste the output. Then help me read it and decide the next step.
+- You may create and edit files, but only one small group of related files at a
+  time, and explain each file before writing it.
+- Git: never run git add, git commit or git push. At the end of each phase, suggest
+  the exact git commands and a commit message, and I'll run them.
+- At the end of each phase, give me 3–5 questions an interviewer might ask
+  about what we built, so I can check my understanding.
+
+  
