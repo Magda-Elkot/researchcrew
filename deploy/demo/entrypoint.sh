@@ -32,4 +32,18 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
+# Documents whose licence doesn't allow sharing (see data/SOURCES.md) must not be served by a
+# container that may be reachable from outside (e.g. through a tunnel): delete them first.
+for doc_id in ${DEMO_EXCLUDE_DOC_IDS:-}; do
+  python - "$doc_id" <<'PY'
+import json, sys, urllib.request
+body = {"filter": {"must": [{"key": "doc_id", "match": {"value": sys.argv[1]}}]}}
+req = urllib.request.Request(
+    "http://127.0.0.1:6333/collections/documents/points/delete?wait=true",
+    data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="POST")
+urllib.request.urlopen(req, timeout=10)
+print(json.dumps({"message": "excluded document", "doc_id": sys.argv[1]}))
+PY
+done
+
 exec docs-mcp

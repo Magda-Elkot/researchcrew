@@ -80,8 +80,10 @@ re-download 2.3 GB**. Moving the model step **before** the code fixed it.
 It was exported in a way that blocks ONNX Runtime's optimisations, and it uses a different pooling.
 **Lesson:** "ONNX is faster" is often true, but **measure** first.
 
-**A security fix from the review:** log redaction now also hides fields like `hf_token`,
-because this phase introduces a Hugging Face token.
+**Fixes from the reviews:**
+- Log redaction now also hides fields like `hf_token` (this phase introduced a Hugging Face token).
+- The demo container **removes the UNESCO flyer at startup**: its licence isn't confirmed, and a tunnel would
+  make the demo public, which would mean publishing it. So the shareable demo serves 4 documents.
 
 ## 6. Surprise: Hugging Face is no longer free for Docker apps
 

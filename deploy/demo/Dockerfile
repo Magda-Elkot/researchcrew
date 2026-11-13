@@ -58,13 +58,14 @@ ENV PATH="/app/.venv/bin:$PATH" \
     QDRANT__STORAGE__STORAGE_PATH=/tmp/qdrant/storage \
     QDRANT__STORAGE__SNAPSHOTS_PATH=/tmp/qdrant/snapshots \
     QDRANT__TELEMETRY_DISABLED=true \
-    QDRANT_INIT_FILE_PATH=/tmp/qdrant/.initialized
+    QDRANT_INIT_FILE_PATH=/tmp/qdrant/.initialized \
+    DEMO_EXCLUDE_DOC_IDS=unesco-ethics-of-ai-recommendation-flyer-en
 
 USER user
 WORKDIR /home/user
 EXPOSE 7860
 
 HEALTHCHECK --interval=20s --timeout=5s --start-period=180s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/health', timeout=3)"]
+    CMD ["python", "-c", "import os, urllib.request; port = os.environ.get('PORT') or os.environ.get('DOCS_MCP_PORT', '7860'); urllib.request.urlopen(f'http://127.0.0.1:{port}/health', timeout=3)"]
 
 CMD ["/app/entrypoint.sh"]

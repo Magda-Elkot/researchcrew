@@ -16,6 +16,11 @@ qdrant_url="${qdrant_url:-http://localhost:6333}"
 collection="documents"
 
 echo "Assembling $out (Qdrant: $qdrant_url)"
+if ! curl -sf "$qdrant_url/collections/$collection" >/dev/null; then
+  echo "Qdrant at $qdrant_url has no '$collection' collection. Start it and index first:" >&2
+  echo "  docker compose up -d qdrant && make ingest" >&2
+  exit 1
+fi
 rm -rf "$out"
 mkdir -p "$out"
 

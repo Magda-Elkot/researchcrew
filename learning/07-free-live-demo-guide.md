@@ -55,7 +55,9 @@ Copy that address: below it's `<LINK>`. Leave this terminal open too.
 curl -s <LINK>/health
 uv run python deploy/demo/smoke_test.py <LINK>/mcp
 ```
-Expected: `{"status":"ok","version":"0.1.0"}`, then `tools: [...]`, `documents: 5` and 5 search lines.
+Expected: `{"status":"ok","version":"0.1.0"}`, then `tools: [...]`, `documents: 4` and 5 search lines.
+(4, not 5: the demo container removes the UNESCO flyer at startup, because its licence isn't confirmed
+and a tunnel makes the demo public.)
 Times are higher than on localhost because the requests travel through Cloudflare.
 
 You can also test it with the MCP Inspector (`make inspect`, transport **Streamable HTTP**, URL `<LINK>/mcp`),

@@ -6,6 +6,7 @@ collection ships as a Qdrant snapshot and is restored at every start.
 
 - MCP endpoint: `/mcp` (streamable HTTP) on `$PORT` if set, else 7860
 - Health: `/health`
+- Documents without a confirmed licence are removed at startup (`DEMO_EXCLUDE_DOC_IDS`, default: the UNESCO flyer), so a tunnel never serves them.
 
 Free tools only (DECISIONS #48–50): runs locally (`make demo-run`); a temporary public link via a free Cloudflare quick tunnel (`make demo-tunnel`). Not the final deployment. Document sources and
 licences: `data/SOURCES.md` in the ResearchCrew repository.
