@@ -72,7 +72,7 @@ The user submits a research question (English or Arabic). A crew of agents plans
 ## DEPLOYMENT
 - Dockerfiles for api, docs-mcp and frontend; docker-compose also starts Qdrant (and optionally self-hosted Langfuse).
 - Multi-stage builds, non-root user, healthchecks, .env.example with every variable.
-- Deploy instructions for Hugging Face Spaces (Docker SDK) or Google Cloud Run free tier.
+- Deploy instructions for the free demo: a static page (HF static Space or GitHub Pages) and running the live system locally, optionally via a free Cloudflare quick tunnel (DECISIONS #50).
 
 ## QUALITY
 - Structure: app/agents, app/tools, app/api, mcp_servers/docs_mcp, evals/, tests/
@@ -101,7 +101,7 @@ The user submits a research question (English or Arabic). A crew of agents plans
 - Job storage: SQLite for jobs and results (no Redis/Celery in v1).
 - Frontend: Streamlit (single page).
 - Observability: Langfuse Cloud (free Hobby plan) by default; self-hosting is optional.
-- Demo host: Hugging Face Spaces (Docker SDK).
+- Demo: **free tools only, no card.** A free static page (Hugging Face static Space or GitHub Pages) with example reports, results, screenshots and a GIF; the live system runs locally with docker compose; for live demos, a temporary free Cloudflare quick tunnel. Changed 2026-11-13: HF Docker Spaces now need a paid plan, Cloud Run needs a card (DECISIONS #48–50).
 - Pin all dependency versions in Phase 1; record them in DECISIONS.md.
 
 ## NON-GOALS (do not build in v1)

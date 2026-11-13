@@ -68,4 +68,15 @@
 | **Streamable HTTP** | The MCP transport we use: the client talks to the server over normal HTTP at `/mcp`. |
 | **MCP Inspector** | The official tool to test an MCP server by hand. |
 | **Cross-lingual search** | An Arabic question finds English text (and the other way round), because bge-m3 puts both in the same "meaning space". |
+| **Hugging Face Space** | Hosting for AI demos. Static pages are free; Docker apps now need a paid PRO plan. |
+| **Google Cloud Run** | Google's container hosting with a free allowance, but it needs a card, so we didn't use it (free tools only). |
+| **Static page / static Space** | A website made only of files (HTML, images): free to host on HF or GitHub Pages, but it can't run Python. |
+| **Cloudflare quick tunnel** | A free command (`cloudflared tunnel --url …`) that gives a program on your laptop a temporary public https address. No account, no card. |
+| **402 Payment Required** | An HTTP error meaning "you must pay for this". |
+| **Spike** | A short experiment to check a risk early. Not the final version. |
+| **Cold start** | Time from "container starts" to "ready to answer" (ours: 9.1 s). |
+| **Snapshot (Qdrant)** | A file containing a whole collection; restored at start instead of re-indexing. |
+| **uid 1000** | The user id HF runs containers as; files must belong to it to be writable. |
+| **ONNX / ONNX Runtime** | A portable model format and a fast engine to run it. Our tested ONNX file was slower and gave different vectors, so we kept PyTorch. |
+| **Docker layer cache** | Docker reuses unchanged build steps; a changed step rebuilds everything after it. |
 | **Volume (Docker)** | Storage that lives outside the container, so data (like the model) survives restarts. |

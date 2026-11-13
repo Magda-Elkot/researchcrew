@@ -199,6 +199,18 @@ The 2025 WHO Arabic report needed **1,122** fixes.
 Too many different pairs are broken, so `extract.py` **rejects** such a PDF with a clear message
 (like scanned PDFs). Better no document than a wrong one.
 
+**What the fix can't repair (found in the 3rd review):** this PDF reverses **every** lam-alef, also in the
+middle of words: `السلامة` (safety) → `السالمة`, `الملاريا` (malaria) → `المالريا`. No safe rule exists,
+because the broken form can be a real word (`سالم` = "safe"). We **measured** the effect on search:
+
+| Arabic query (correct spelling) | Result |
+|---|---|
+| مكافحة الملاريا (malaria control) | Broken chunk at #2; #1 is the English report's malaria page ✅ |
+| صحة اللاجئين (refugee health) | #1 ✅ |
+| سلامة المرضى (patient safety) | Not in the top 10 ⚠️ |
+
+Meaning-based search mostly copes, but not always, so we recorded it as a known limitation (DECISIONS #47).
+
 **Lesson (good interview story):** always test with **real** data. Our unit tests passed, but only the
 real PDFs showed this problem.
 

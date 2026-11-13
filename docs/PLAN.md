@@ -24,7 +24,7 @@ These supplement the DECISIONS section of SPEC.md. They are also recorded in [..
 | Tool guardrails | One wrapper module (`app/tools/guarded.py`) wraps every MCP tool: per-run call counter, deadline check, retry once (tenacity), `tool_called`/`tool_failed` events, and recording the raw tool output. It's the single source for limits, SSE tool events, the eval tool-success rate and faithfulness evidence. |
 | Evidence integrity | An `EvidenceItem.snippet` must be a verbatim substring of a recorded raw tool result (after whitespace/Unicode normalisation), checked in code. Items that fail are dropped and logged. |
 | Timeout | Cooperative: the tool wrapper and each task boundary check a per-run deadline. The API marks the job `failed` when the deadline passes, even if the worker thread is still finishing. uvicorn runs with **one worker**. |
-| HF Spaces deploy | Separate `Dockerfile.space`: one combined image, with a small supervisor script running api + docs-mcp + Streamlit + Qdrant. docker-compose stays multi-container. The Qdrant collection is **pre-built and shipped in the image** (no runtime ingest), and the model is baked into the image. A global daily run limit, plus a fallback to pre-generated example reports, protects the shared API keys. |
+| Demo (free only) | **Changed 2026-11-13 (DECISIONS #48–50):** no paid/card hosting. A free static page (HF static Space or GitHub Pages) shows example reports, results, screenshots and a GIF; the live system runs locally with docker compose, optionally exposed temporarily with a free Cloudflare quick tunnel. A daily run limit + example-report fallback still protect the shared API keys when exposed. |
 | Free-tier limits | Evidence passed between tasks has a size cap (snippet length, top-N findings). Evals are throttled (configurable concurrency + backoff), **resumable**, and use quick depth. Tavily results are cached per eval question for reruns. |
 | Eval size | The SPEC minimum: **25 questions × 2 configs**, quick depth. On Groq's free tier (~100K tokens/day) this is expected to take **several weeks**. |
 | Completeness metric | Each dataset line has 3–5 reference `expected_aspects`. Completeness is judged against them; coverage of the Planner's sub-questions is a secondary check. |
@@ -50,7 +50,7 @@ These supplement the DECISIONS section of SPEC.md. They are also recorded in [..
   - Gemini: the judge model.
   - Tavily: about 1,000 credits/month.
   - Langfuse Cloud Hobby: Langfuse itself is MIT and can be self-hosted instead.
-  - Hugging Face Spaces: CPU basic tier (no persistent disk; sleeps when idle).
+  - Hosting: free tools only, no card. HF Docker Spaces need a paid plan and Cloud Run needs a card (DECISIONS #48–50), so the public demo is a static page and the live system runs locally.
   - GitHub Actions: free for public repos.
 - **Caveat:** the Brave Search fallback may ask for card verification, so Tavily stays primary.
 
@@ -62,7 +62,7 @@ SPEC's definitions of done are unchanged.
 |---|---|---|---|
 | 1 | Skeleton, config, Docker, CI | [phase-1-skeleton.md](phase-1-skeleton.md) — **detailed** | `docker compose up` starts api placeholder + Qdrant; `/health` returns 200; CI green |
 | 2 | docs-mcp server + ingestion + tests | [phase-2-docs-mcp.md](phase-2-docs-mcp.md) | `ingest` indexes data/pdfs; every tool has passing tests; works in MCP Inspector |
-| 2b | Spike: HF Space feasibility | [phase-2b-space-spike.md](phase-2b-space-spike.md) | docs-mcp + Qdrant (pre-built collection) answer a search on a private Space; size, RAM and startup time recorded |
+| 2b | Spike: hosting feasibility | [phase-2b-space-spike.md](phase-2b-space-spike.md) | One demo container (docs-mcp + Qdrant + model + snapshot) answers searches under small-host limits; size, RAM, startup recorded; free hosting decision made |
 | 3a | Spike: MCP connectivity from CrewAI | [phase-3-crew.md](phase-3-crew.md#phase-3a--mcp-connectivity-spike) | One agent calls docs-mcp, Tavily and filesystem tools from the CLI; adapter lifecycle decided; tokens per call measured |
 | 3b | Full crew + Flow + guardrails + CLI | [phase-3-crew.md](phase-3-crew.md#phase-3b--full-crew) | `uv run researchcrew "question"` produces valid Report JSON + Markdown; tokens, cost and a basic trace recorded |
 | 4 | FastAPI + SSE + Streamlit | [phase-4-api-ui.md](phase-4-api-ui.md) | POST/GET work; frontend shows live SSE progress and the report |

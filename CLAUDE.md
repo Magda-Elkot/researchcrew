@@ -27,6 +27,7 @@
 - Index PDFs: `uv run ingest data/pdfs` (or `make ingest`; `--force` re-embeds unchanged files)
 - docs-mcp server: `uv run docs-mcp` (or `make docs-mcp`; MCP at http://127.0.0.1:8001/mcp)
 - MCP Inspector: `make inspect` (UI) or `npx -y @modelcontextprotocol/inspector@2.13.0 --cli http://localhost:8001/mcp --transport http --method tools/list`
+- Demo container (Phase 2b): `make demo-prepare`, `make demo-build`, `make demo-run`, then `uv run python deploy/demo/smoke_test.py http://localhost:7860/mcp`; free public test link: `make demo-tunnel` (you run it; see learning/07-free-live-demo-guide.md)
 - Evals: `make eval` (placeholder until Phase 6)
 (Update this list whenever you add a new command.)
 

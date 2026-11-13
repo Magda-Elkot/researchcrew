@@ -18,8 +18,11 @@ from app.config import get_settings, secret_values
 
 REDACTED = "***"
 
+# Secret-looking field names. "token" is singular on purpose: `hf_token` / `access_token` are
+# secrets, but token *counts* such as `prompt_tokens` and `total_tokens` must stay visible.
 _SENSITIVE_KEY = re.compile(
-    r"^(api_key|.*_api_key|.*_secret_key|password|authorization)$", re.IGNORECASE
+    r"^(api_key|.*_api_key|.*_secret_key|(.*_)?secret|(.*_)?token|password|authorization)$",
+    re.IGNORECASE,
 )
 # Query params like ?apiKey=, &tavilyApiKey=, ?access_token=, ?key=
 _URL_SECRET_PARAM = re.compile(

@@ -24,21 +24,24 @@
   - Bruno: `docs_mcp_health.bru` added.
 - 2026-11-13: review of Phases 1–2 (DECISIONS #39–41): ports bound to localhost (security), pipeline version in the ingest fingerprint, `--prune`, duplicate doc_id detection, `EMBEDDING_THREADS=0` = all cores; `get_document` now reads page ranges, capped (DECISIONS #42). 125 tests passing.
 
+- 2026-11-13: Phase 2b local part (DECISIONS #43–46): single-container Space image (docs-mcp + Qdrant + bge-m3 + snapshot) passes every HF free-tier limit locally: 4.13 GB, cold start 9.1 s, RAM 1.15 GB, search median 103 ms on 2 CPUs, uid 1000. Your ONNX bge-m3 export was tested and not adopted (slower, different vectors). Review fixes: `*_token`/`*_secret` log redaction, entrypoint readiness check, model layer before code. 126 tests passing.
+
 ## Definition of done: Phase 2
 - [x] `ingest` indexes data/pdfs (5 PDFs, 230 chunks; the broken 2019 WHO PDF is rejected by design).
 - [x] Every docs-mcp tool (and the resource) has passing unit tests.
 - [x] The server works with the MCP Inspector.
 
 ## Next
-- Your review of Phase 2, then a local commit (commands in the Phase 2 summary). CI runs on your next push.
+- Optional, free: test the demo container over the internet with a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
+- Phase 3a (MCP spike with CrewAI).
 - Optional data top-up (manual browser download, see `data/SOURCES.md`): the UNESCO Recommendation full text (EN + AR) and an Arabic renewable-energy report. Then `make ingest`.
-- Phase 2b (HF Space spike) or Phase 3a (MCP spike with CrewAI), per docs/PLAN.md.
 - Parallel track (needs your approval): 25 eval questions with `expected_aspects`, covering the indexed topics.
 
 ## Known issues / risks
 - The Groq free-tier token/day limit means the eval will take several weeks (measured in Phase 3b).
 - Hierarchical mode may be unreliable; the fallback is a two-model comparison.
-- HF Space limits: api image 1.47 GB, docs-mcp image 1.73 GB + a 2.3 GB model; to be tested in Phase 2b.
+- HF Space: the docs-mcp spike fits locally; not yet verified on a real Space. The api + agents (Phase 3+) will add more RAM/CPU load.
+- This machine's `docker build` is the legacy builder (no buildx plugin), so no BuildKit cache mounts outside compose.
 - mcp is pinned below 2 because of crewai; revisit when crewai supports mcp 2.x.
 - Starlette warns that `TestClient` with `httpx` is deprecated in favour of `httpx2`. Harmless for now; switching would add a library, so it needs approval.
 - uvicorn's own access logs are not JSON yet (planned for Phase 4).
@@ -47,5 +50,5 @@
 - The UNESCO flyer has no licence statement, so it's git-ignored until confirmed.
 - The WHO PDFs have no title metadata, so their title is the file name.
 - Arabic numbers and punctuation can appear out of place inside RTL lines (PDF bidi order); search still works.
-- The lam-alef fix covers only the safe "ال + alef-type" case; other swapped pairs make a PDF be rejected, not fixed.
+- The lam-alef fix covers only the safe "ال + alef-type" case. The WHO Arabic PDF also has mid-word reversed lam-alef (e.g. السالمة for السلامة); some Arabic queries lose recall ("patient safety" not in top 10). DECISIONS #47.
 - VS Code shows "pydantic is not installed": select the project interpreter `.venv/bin/python`.

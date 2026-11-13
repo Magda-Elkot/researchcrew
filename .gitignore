@@ -22,3 +22,10 @@ build/
 
 # Sample PDFs whose licence is not confirmed yet (see data/SOURCES.md)
 data/pdfs/unesco-ethics-of-ai-recommendation-flyer-en.pdf
+
+# Generated demo container folder (deploy/demo/prepare.sh)
+deploy/demo/build/
+
+# Local model files (GBs): never commit (see models/README.md)
+models/*
+!models/README.md

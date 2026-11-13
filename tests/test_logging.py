@@ -68,3 +68,20 @@ def test_get_logger_emits_json(capsys: pytest.CaptureFixture[str]) -> None:
     get_logger("app.test").warning("visible", extra={"n": 1})
     line = capsys.readouterr().out.strip().splitlines()[-1]
     assert json.loads(line)["n"] == 1
+
+
+def test_token_and_secret_fields_are_redacted_but_counts_kept() -> None:
+    data = _format(
+        "x",
+        {
+            "hf_token": "hf_abc",
+            "access_token": "tok",
+            "token": "t",
+            "langfuse_secret": "s",
+            "total_tokens": 42,
+            "max_tokens": 1024,
+        },
+    )
+    for key in ("hf_token", "access_token", "token", "langfuse_secret"):
+        assert data[key] == REDACTED
+    assert (data["total_tokens"], data["max_tokens"]) == (42, 1024)

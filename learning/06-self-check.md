@@ -141,3 +141,34 @@ Security (Qdrant without a password was reachable from the Wi-Fi → ports bound
 (code fixes never reached already-indexed PDFs → pipeline version in the fingerprint; renamed files left duplicates
 → `--prune`), and real limits (`get_document` could return ~90,000 tokens vs Groq's ~12,000/min → page ranges with a cap).
 </details>
+
+## Phase 2b
+
+<details><summary><b>21. How do you run a vector database and an MCP server on a host that allows one port and no disk?</b></summary>
+
+Put both in one container: Qdrant listens only on 127.0.0.1 and docs-mcp on the one public port (7860). There is no persistent
+disk, so the index ships as a Qdrant **snapshot** inside the image and is restored at every start (2 s). The model is baked in too,
+so the container never downloads anything. Measured with HF's limits: cold start 9.1 s, RAM 1.15 GB, search ~100 ms.
+</details>
+
+<details><summary><b>22. Someone says "use ONNX, it's faster". What did you do?</b></summary>
+
+Measured on 24 real chunks: the available ONNX export was 37% slower (its weights were stored as graph inputs, blocking
+optimisations) and produced different vectors (cosine ~0.6 with the indexed ones, because of different pooling).
+So we kept PyTorch and noted a correct export as an optional later optimisation.
+</details>
+
+<details><summary><b>23. Why does the order of steps in a Dockerfile matter?</b></summary>
+
+Docker caches each step and rebuilds everything after the first changed one. Put slow, rarely-changing steps (dependencies,
+a 2.3 GB model download) before often-changing ones (your code), or every code change repeats the slow steps.
+</details>
+
+<details><summary><b>24. Your planned free host turned out to be paid. What did you do?</b></summary>
+
+The spike found it early: creating the Hugging Face Docker Space returned `402 Payment Required` (PRO needed). Cloud Run
+works with the same container but needs a card. With a "free tools only" rule, we split the demo: a free static page
+(example reports, results, GIF) is the public face, the live system runs locally with docker compose, and for live demos a
+free Cloudflare quick tunnel gives a temporary public link. The reason: the model alone needs ~1.2 GB RAM, more than free
+no-card hosts give (~512 MB).
+</details>

@@ -19,6 +19,11 @@ Run them from the project folder:
 | `make docs-mcp` / `uv run docs-mcp` | Run the MCP server locally at `http://127.0.0.1:8001/mcp` |
 | `make inspect` | Open the MCP Inspector in the browser |
 | `docker compose run --rm docs-mcp ingest /app/data/pdfs` | Run ingest inside the docs-mcp container |
+| `make demo-prepare` | Phase 2b: build the demo folder (code + Qdrant snapshot) |
+| `make demo-build` | Phase 2b: build the demo image (downloads bge-m3 once) |
+| `make demo-run` | Phase 2b: run it like a small host (2 CPUs, 4 GB, uid 1000) on port 7860 |
+| `uv run python deploy/demo/smoke_test.py http://localhost:7860/mcp` | Connect as an MCP client and time 5 searches |
+| `make demo-tunnel` | A **temporary** free public https link to the demo on :7860 (needs `cloudflared`; Ctrl+C stops it) |
 
 ## uv (packages)
 
