@@ -17,12 +17,14 @@
   crewai-tools), check its official docs instead of guessing.
 
 ## Commands
-- Install: `uv sync`
-- Run tests: `uv run pytest`
-- Lint/format: `uv run ruff check . --fix && uv run ruff format .`
-- Type check: `uv run mypy app mcp_servers`
-- Start everything: `docker compose up --build`
-- Evals: `make eval`
+- Install: `uv sync --all-groups` (or `make install`)
+- Run tests: `uv run pytest` (or `make test`)
+- Lint/format: `uv run ruff check . --fix && uv run ruff format .` (or `make format`; `make lint` only checks)
+- Type check: `uv run mypy app mcp_servers` (or `make typecheck`)
+- Everything CI runs except Docker: `make check`
+- Start everything: `docker compose up --build` (or `make up` detached; `make down` stops)
+- CLI stub: `uv run researchcrew`
+- Evals: `make eval` (placeholder until Phase 6)
 (Update this list whenever you add a new command.)
 
 ## Code conventions
