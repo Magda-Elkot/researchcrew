@@ -95,6 +95,9 @@ def _configure() -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(get_settings().log_level.upper())
+    # Libraries that log every HTTP request at INFO: keep only their warnings.
+    for noisy in ("httpx", "httpcore", "huggingface_hub", "sentence_transformers", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     _configured = True
 
 

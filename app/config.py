@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     chunk_tokens: int = Field(default=800, gt=0)
     chunk_overlap: int = Field(default=100, ge=0)
     model_cache_dir: str | None = None  # None = Hugging Face default (~/.cache/huggingface)
+    # CPU threads for embedding. Fewer = slower ingest but a responsive machine; 0 = all cores.
+    embedding_threads: int = Field(default=4, ge=0)
     docs_mcp_host: str = "127.0.0.1"
     docs_mcp_port: int = Field(default=8001, gt=0, le=65535)
 

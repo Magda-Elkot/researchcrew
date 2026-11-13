@@ -79,6 +79,7 @@ def test_docs_mcp_defaults() -> None:
     assert settings.embedding_dim == 1024
     assert (settings.chunk_tokens, settings.chunk_overlap) == (800, 100)
     assert settings.model_cache_dir is None
+    assert settings.embedding_threads == 4
     assert (settings.docs_mcp_host, settings.docs_mcp_port) == ("127.0.0.1", 8001)
 
 
@@ -101,5 +102,13 @@ def test_invalid_numbers_are_rejected(
     monkeypatch: pytest.MonkeyPatch, name: str, value: str
 ) -> None:
     monkeypatch.setenv(name, value)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_embedding_threads_zero_means_all_cores(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EMBEDDING_THREADS", "0")
+    assert Settings().embedding_threads == 0
+    monkeypatch.setenv("EMBEDDING_THREADS", "-1")
     with pytest.raises(ValidationError):
         Settings()

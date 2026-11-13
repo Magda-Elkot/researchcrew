@@ -46,6 +46,24 @@ The summary table lives in [docs/PLAN.md](docs/PLAN.md#resolved-decisions).
 | 27 | Sample-data topics: **public health** (WHO), **AI ethics** (UNESCO) and **renewable energy** (IRENA), each with English and Arabic PDFs. | All three publishers release born-digital PDFs with official Arabic editions under licences that allow reuse with attribution (WHO CC BY-NC-SA 3.0 IGO, UNESCO CC BY-SA 3.0 IGO, IRENA attribution terms). The exact files are listed in `data/SOURCES.md` after you approve them. |
 | 28 | mypy `untyped_calls_exclude = ["pymupdf"]` (strict mode otherwise unchanged). | PyMuPDF's `Document` constructor has no type hints. This allows calls into that one package without `type: ignore` comments or loosening checks on our own code. |
 | 29 | `env_ignore_empty=True` in Settings: `VAR=` in `.env` means unset. | `.env.example` leaves optional values (e.g. `MODEL_CACHE_DIR`) empty; an empty `GROQ_API_KEY=` also counts as missing for `require()`. |
+| 30 | Store design: one Qdrant point per chunk (payload: doc_id, title, language, chunk_index, page range, text). Chunk 0 also holds the document record (metadata + full text) used by `get_document` and `docs://list`. Point ids are `uuid5(doc_id:chunk_index)`, and re-ingest deletes the doc's points first. | No second collection or database needed; idempotent re-ingest; `docs://list` is one filtered scroll. Search excludes the heavy payload fields. |
+| 31 | Chunking counts **bge-m3 tokens** via the tokenizer's offset mapping and keeps `page_start`/`page_end` per chunk. Tokenizer and embedder are Protocols; tests use a whitespace tokenizer and a hashing fake embedder. | Correct sizes for Arabic and English alike; pages for citations; tests stay offline. |
+| 32 | Arabic: fix swapped lam-alef ligatures (`ا[اأإآ]ل` → `ال[اأإآ]`, safe because two alef-type letters never follow each other), and **reject** PDFs where other letter pairs are swapped (`يف` > `في`, words ending `ىل`). | Found on the real WHO EMRO PDFs: the 2025 report needed 1,122 lam-alef fixes; the 2019 overview had `يف` 2207× vs `في` 2× and cannot be fixed safely, so it is rejected. |
+| 33 | Sample data (step 8): 5 PDFs: WHO EMRO annual report 2024/2025 (EN + AR), IRENA Arab region 2016 and GCC 2023 (EN), UNESCO AI-ethics flyer (EN, local only: no licence statement). The UNESCO full Recommendation (EN/AR) and an Arabic energy report still need a manual browser download (`data/SOURCES.md`). | UNESCO, the UN Digital Library and ESCWA block scripted downloads; we don't work around bot protection. |
+| 34 | `EMBEDDING_THREADS` (default 4) caps torch CPU threads. Ingest skips files whose fingerprint (SHA-256 of file + model + chunk settings) is unchanged; `--force` re-embeds. Noisy HTTP loggers are set to WARNING. | Embedding is the CPU-heavy step (bge-m3, 568M parameters, no bf16/AMX on this CPU). Re-runs become nearly free. |
+| 35 | docs-mcp container: only the `docs` group; model not baked into the image but mounted at `/models`: a named volume by default, or the host HF cache via `MODEL_CACHE_HOST_DIR` + `HF_HUB_OFFLINE=1`. Compose `environment` forces `DOCS_MCP_HOST=0.0.0.0`, the in-network `QDRANT_URL` and `MODEL_CACHE_DIR`. | Keeps the image smaller and rebuilds fast; no 2.3 GB re-download on this machine. `environment` beats `env_file`, so a local `.env` can't break the container. |
+| 36 | FastMCP's DNS-rebinding protection is on for `127.0.0.1` (local runs) and off for `0.0.0.0` (Docker network). No auth in v1. | Auth is a SPEC non-goal; docs-mcp only serves read-only public documents and is not exposed publicly. |
+| 37 | Server tests use a real MCP client session in memory (`create_connected_server_and_client_session`), not direct function calls. | Exercises the protocol (schemas, validation, errors, resources) the way CrewAI and the Inspector will. |
+| 38 | Lint/type exceptions: ruff `allowed-confusables = ["ا"]`; `# type: ignore[untyped-decorator]` on FastMCP's `custom_route`; pytest ignores Qdrant's in-memory "payload indexes have no effect" warning. | Each one is the narrowest switch for a known, intentional case. |
+
+## 2026-11-13: Review of Phases 1–2 before push
+
+| # | Decision | Why |
+|---|---|---|
+| 39 | All compose ports are published on `127.0.0.1` only. | Qdrant has no auth; with `0.0.0.0` anyone on the same network could read or delete the collection. Verified: not reachable from the LAN address. |
+| 40 | Ingest fingerprint includes `PIPELINE_VERSION` (bump on extraction/chunking changes). `--prune` deletes documents whose PDF is gone. Two files mapping to the same doc_id are reported as an error, not overwritten. | Otherwise code fixes never reach already-indexed PDFs, renamed files leave duplicates in search, and `a b.pdf` / `a-b.pdf` silently overwrite each other. |
+| 41 | `EMBEDDING_THREADS=0` means all cores (empty = default 4). | With `env_ignore_empty`, "leave empty for all cores" could never work. |
+| 42 | **SPEC extension:** `get_document(doc_id, start_page=1, end_page=None, max_chars=12000)` returns a page range with `[page N]` markers, capped (1,000–50,000 chars), with `truncated`, `end_page` and the total `pages`. Text is stored per page on chunk 0 (`pages_text`); `PIPELINE_VERSION` bumped to 2. | The full text of the IRENA GCC report is ~358,000 characters (~90,000 tokens), far above Groq's free tier (~12,000 tokens/min). A safe default lets agents read long reports page by page, and the page markers help citations. Chosen by you in the pre-push review. |
 
 ## Pinned versions
 Resolved 2026-11-13 with uv 0.12.19 on Python 3.12.3. 204 packages are locked in `uv.lock`; this table lists only the direct dependencies.
@@ -82,3 +100,12 @@ _Filled in during Phases 1, 2b, 3a and 3b: image sizes, startup times, tokens an
 | 2026-11-13 | Local `.venv` (all groups incl. CPU torch) | 2.4 GB |
 | 2026-11-13 | api container start → healthy | ~10 s |
 | 2026-11-13 | Test suite (55 tests) | ~0.3 s |
+| 2026-11-13 | Ingest, 5 PDFs → 230 chunks, all 14 threads (i7-13650HX, no bf16/AMX) | 5 min 0 s wall, 1303% CPU, 3.0 GB RAM |
+| 2026-11-13 | Ingest, same, `EMBEDDING_THREADS=4` | 5 min 49 s wall (+16%), 391% CPU, 3.0 GB RAM |
+| 2026-11-13 | Ingest again, nothing changed (fingerprints match) | 1.1 s (0.1 s of work) |
+| 2026-11-13 | Embedding speed, CPU | ~1.25 s per 800-token chunk (14 threads), ~1.5 s (4 threads) |
+| 2026-11-13 | bge-m3 load from local cache | 6.6 s; one search (embed + Qdrant) 60–90 ms |
+| 2026-11-13 | bge-m3 on disk (HF cache, 2 snapshots) | 4.3 GB (a single snapshot is ~2.3 GB) |
+| 2026-11-13 | docs-mcp image (`docs` group, CPU torch, no model) | 1.73 GB; build 2 min 33 s |
+| 2026-11-13 | docs-mcp container start → healthy (model from mounted cache) | 12 s |
+| 2026-11-13 | Test suite (114 tests) | ~2 s |

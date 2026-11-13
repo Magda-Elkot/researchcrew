@@ -1,3 +1,5 @@
+# Host ports are published on 127.0.0.1 only: Qdrant has no auth, so it must not be
+# reachable from the local network.
 services:
   api:
     build:
@@ -9,9 +11,35 @@ services:
       # Inside the compose network Qdrant is reachable by service name, not localhost.
       QDRANT_URL: http://qdrant:6333
     ports:
-      - "${API_HOST_PORT:-8000}:8000"
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     volumes:
       - ./data:/app/data:ro
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+  docs-mcp:
+    build:
+      context: .
+      dockerfile: docker/docs-mcp.Dockerfile
+    image: researchcrew-docs-mcp:dev
+    env_file: .env
+    environment:
+      # `environment` wins over env_file, so these container-specific values always apply.
+      QDRANT_URL: http://qdrant:6333
+      DOCS_MCP_HOST: 0.0.0.0
+      DOCS_MCP_PORT: "8001"
+      MODEL_CACHE_DIR: /models
+      # Set HF_HUB_OFFLINE=1 in .env when /models is an existing host cache (no downloads).
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+    ports:
+      - "127.0.0.1:${DOCS_MCP_HOST_PORT:-8001}:8001"
+    volumes:
+      - ./data:/app/data:ro
+      # A named volume by default (first start downloads bge-m3 into it); set
+      # MODEL_CACHE_HOST_DIR to a host Hugging Face hub folder to reuse a downloaded model.
+      - ${MODEL_CACHE_HOST_DIR:-model_cache}:/models
     depends_on:
       qdrant:
         condition: service_healthy
@@ -21,7 +49,7 @@ services:
     image: qdrant/qdrant:v1.20.1
     ports:
       # Host port is configurable in case another Qdrant already uses 6333.
-      - "${QDRANT_HOST_PORT:-6333}:6333"
+      - "127.0.0.1:${QDRANT_HOST_PORT:-6333}:6333"
     volumes:
       - qdrant_storage:/qdrant/storage
     healthcheck:
@@ -39,3 +67,4 @@ services:
 
 volumes:
   qdrant_storage:
+  model_cache:

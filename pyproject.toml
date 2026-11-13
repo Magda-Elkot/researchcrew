@@ -53,6 +53,8 @@ torch = [{ index = "pytorch-cpu" }]
 
 [project.scripts]
 researchcrew = "app.cli:main"
+ingest = "mcp_servers.docs_mcp.ingest:main"
+docs-mcp = "mcp_servers.docs_mcp.server:main"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13"]
@@ -69,6 +71,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+# The project handles Arabic on purpose; some Arabic letters look like Latin ones to
+# RUF001-003 (alef ~ "l", heh ~ "o").
+allowed-confusables = ["ا", "ه"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -88,3 +93,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-ra"
+filterwarnings = [
+    # Tests use qdrant-client's in-memory mode, which ignores payload indexes (expected).
+    "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",
+]

@@ -1,6 +1,6 @@
 # Phase 2 — docs-mcp server + ingestion + tests
 
-**Status:** in progress (started 2026-11-13, learning mode). Detailed steps are at the end of this file. [Back to master plan](PLAN.md)
+**Status:** done locally 2026-11-13 (steps 1–2 in learning mode, 3–12 by Claude on request). Detailed steps are at the end of this file. [Back to master plan](PLAN.md)
 
 ## Goal
 Build our own MCP server, `docs-mcp`, with FastMCP. It does semantic search over a folder of PDFs indexed in Qdrant with BAAI/bge-m3.

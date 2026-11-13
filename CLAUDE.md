@@ -24,6 +24,9 @@
 - Everything CI runs except Docker: `make check`
 - Start everything: `docker compose up --build` (or `make up` detached; `make down` stops)
 - CLI stub: `uv run researchcrew`
+- Index PDFs: `uv run ingest data/pdfs` (or `make ingest`; `--force` re-embeds unchanged files)
+- docs-mcp server: `uv run docs-mcp` (or `make docs-mcp`; MCP at http://127.0.0.1:8001/mcp)
+- MCP Inspector: `make inspect` (UI) or `npx -y @modelcontextprotocol/inspector@2.13.0 --cli http://localhost:8001/mcp --transport http --method tools/list`
 - Evals: `make eval` (placeholder until Phase 6)
 (Update this list whenever you add a new command.)
 

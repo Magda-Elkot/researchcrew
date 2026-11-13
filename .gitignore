@@ -19,3 +19,6 @@ build/
 .vscode/
 .idea/
 .DS_Store
+
+# Sample PDFs whose licence is not confirmed yet (see data/SOURCES.md)
+data/pdfs/unesco-ethics-of-ai-recommendation-flyer-en.pdf
