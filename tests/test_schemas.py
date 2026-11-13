@@ -205,6 +205,15 @@ def test_job_created_and_token_usage() -> None:
     assert TokenUsage().total_tokens == 0
     with pytest.raises(ValidationError):
         TokenUsage(prompt_tokens=-1)
+    with pytest.raises(ValidationError):
+        JobCreated(job_id="")
+
+
+def test_wrapper_sets_validate_their_items() -> None:
+    with pytest.raises(ValidationError):
+        EvidenceSet.model_validate({"items": [_evidence(source_type="book")]})
+    with pytest.raises(ValidationError):
+        FindingSet.model_validate({"findings": [{"id": "f1", "statement": "S"}]})
 
 
 def test_job_result_minimal_and_full() -> None:

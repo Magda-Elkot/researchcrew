@@ -39,6 +39,14 @@ The summary table lives in [docs/PLAN.md](docs/PLAN.md#resolved-decisions).
 | 25 | Docker: builder and runtime both use `python:3.12-slim`; uv is copied from `ghcr.io/astral-sh/uv:0.12.19`; the project is installed `--no-editable`; runtime user `app` (uid 10001). | The same base image means the venv's Python path matches; only `.venv` is copied to the runtime image. |
 | 26 | The log handler writes to the *current* `sys.stdout`; uvicorn's own access logs stay in uvicorn's plain format for now. | Lets tests and redirection capture logs. Routing uvicorn logs through the JSON formatter is deferred to Phase 4. |
 
+## 2026-11-13 — Phase 2 start
+
+| # | Decision | Why |
+|---|---|---|
+| 27 | Sample-data topics: **public health** (WHO), **AI ethics** (UNESCO) and **renewable energy** (IRENA), each with English and Arabic PDFs. | All three publishers release born-digital PDFs with official Arabic editions under licences that allow reuse with attribution (WHO CC BY-NC-SA 3.0 IGO, UNESCO CC BY-SA 3.0 IGO, IRENA attribution terms). The exact files are listed in `data/SOURCES.md` after you approve them. |
+| 28 | mypy `untyped_calls_exclude = ["pymupdf"]` (strict mode otherwise unchanged). | PyMuPDF's `Document` constructor has no type hints. This allows calls into that one package without `type: ignore` comments or loosening checks on our own code. |
+| 29 | `env_ignore_empty=True` in Settings: `VAR=` in `.env` means unset. | `.env.example` leaves optional values (e.g. `MODEL_CACHE_DIR`) empty; an empty `GROQ_API_KEY=` also counts as missing for `require()`. |
+
 ## Pinned versions
 Resolved 2026-11-13 with uv 0.12.19 on Python 3.12.3. 204 packages are locked in `uv.lock`; this table lists only the direct dependencies.
 
@@ -73,4 +81,4 @@ _Filled in during Phases 1, 2b, 3a and 3b: image sizes, startup times, tokens an
 | 2026-11-13 | api image (`researchcrew-api:dev`, `api` group, no torch) | 1.47 GB |
 | 2026-11-13 | Local `.venv` (all groups incl. CPU torch) | 2.4 GB |
 | 2026-11-13 | api container start → healthy | ~10 s |
-| 2026-11-13 | Test suite (54 tests) | ~0.3 s |
+| 2026-11-13 | Test suite (55 tests) | ~0.3 s |

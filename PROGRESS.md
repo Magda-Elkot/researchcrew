@@ -1,7 +1,7 @@
 # Progress
 
 ## Current phase
-**Phase 1 (skeleton) complete locally; waiting for a green CI after the first push.** Next: Phase 2 (docs-mcp).
+**Phase 2 (docs-mcp) started 2026-11-13, in learning mode.** Phase 1 is complete locally; CI is unverified because nothing has been pushed yet.
 
 ## Done
 - 2026-11-13: plan reviewed against SPEC.md. Docs updated: PLAN.md, all phase docs, and the new phase-2b spike. Decisions recorded in DECISIONS.md.
@@ -10,13 +10,15 @@
   - crewai 1.15.41 forces mcp 1.x and pydantic <2.13 (DECISIONS #20–21).
   - `app/config.py` (Settings, `get_settings`, `require`), `app/log.py` (JSON + redaction), `app/schemas.py` (all SPEC contracts + API models).
   - Placeholder API (`/health`, `/metrics`, startup key check) and CLI stub (`uv run researchcrew`).
-  - 54 tests passing; ruff and mypy (strict) clean.
+  - 55 tests passing; ruff and mypy (strict) clean.
   - Docker: multi-stage non-root api image (1.47 GB) + Qdrant v1.20.1; both healthy in compose.
   - Makefile, `.gitignore`, `.dockerignore`, `.env.example`, GitHub Actions CI (lint-test + docker build).
 
 ## Next
-- Push and confirm CI is green (first run downloads torch for the `docs` group, so it is slower).
-- Phase 2 — docs-mcp server + ingestion + tests, following [docs/phase-2-docs-mcp.md](docs/phase-2-docs-mcp.md).
+- CI stays unverified until you decide to push (nothing is pushed for now).
+- Phase 2 (in progress, learning mode): docs-mcp server + ingestion + tests, following [docs/phase-2-docs-mcp.md](docs/phase-2-docs-mcp.md).
+  - Done: step 1 (docs-mcp settings), step 2 (`extract.py`: PyMuPDF + NFKC + Arabic check). 70 tests passing.
+  - Next: step 3 (token-based chunking).
 - Parallel track (needs your approval): sample PDFs + `data/notes/` topics, and 25 eval questions with `expected_aspects`.
 
 ## Known issues / risks

@@ -3,9 +3,10 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from app import __version__
-from app.config import ConfigError, get_settings, require, secret_values
+from app.config import ConfigError, Settings, get_settings, require, secret_values
 
 
 def test_defaults() -> None:
@@ -67,3 +68,38 @@ def test_secret_values(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
     get_settings.cache_clear()
     assert secret_values() == ["gsk-test"]
+
+
+# --- docs-mcp settings (Phase 2) ---
+
+
+def test_docs_mcp_defaults() -> None:
+    settings = get_settings()
+    assert settings.embedding_model == "BAAI/bge-m3"
+    assert settings.embedding_dim == 1024
+    assert (settings.chunk_tokens, settings.chunk_overlap) == (800, 100)
+    assert settings.model_cache_dir is None
+    assert (settings.docs_mcp_host, settings.docs_mcp_port) == ("127.0.0.1", 8001)
+
+
+def test_empty_env_value_means_unset(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("MODEL_CACHE_DIR=\nCHUNK_TOKENS=\n")
+    settings = get_settings()
+    assert settings.model_cache_dir is None
+    assert settings.chunk_tokens == 800
+
+
+def test_overlap_must_be_smaller_than_chunk(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHUNK_TOKENS", "100")
+    monkeypatch.setenv("CHUNK_OVERLAP", "100")
+    with pytest.raises(ValidationError, match="CHUNK_OVERLAP must be smaller"):
+        Settings()
+
+
+@pytest.mark.parametrize(("name", "value"), [("DOCS_MCP_PORT", "70000"), ("EMBEDDING_DIM", "0")])
+def test_invalid_numbers_are_rejected(
+    monkeypatch: pytest.MonkeyPatch, name: str, value: str
+) -> None:
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValidationError):
+        Settings()

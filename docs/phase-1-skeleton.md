@@ -1,6 +1,6 @@
 # Phase 1 — Project skeleton, config, Docker, CI (detailed)
 
-**Status:** planned. [Back to master plan](PLAN.md)
+**Status:** done locally 2026-11-13; CI green pending first push. [Back to master plan](PLAN.md)
 
 ## Goal
 Lay a clean foundation with no AI logic yet:
