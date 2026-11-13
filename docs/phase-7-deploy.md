@@ -4,13 +4,19 @@
 
 ## Goal
 A public demo on Hugging Face Spaces (Docker SDK, free CPU tier) and a polished README.
+It builds on the Phase 2b spike results.
 
 ## Scope
 - **Final pass on all Dockerfiles:** multi-stage, non-root, healthchecks. `.env.example` is complete.
 - **`Dockerfile.space`:** one combined image, because a Space runs a single container.
   - A small supervisor script starts Qdrant, docs-mcp, the api and Streamlit, which is the only exposed port.
-  - At build time or first startup, the sample PDFs are ingested so the demo has data.
+  - Files are owned by uid 1000 (the user HF runs the container as).
+  - **No runtime ingest:** the pre-built Qdrant collection and the bge-m3 model are baked into the image (approach proven in Phase 2b).
+  - SQLite job history is temporary: it's lost when the Space restarts or sleeps. This is documented as a limitation.
   - API keys are set as Space secrets.
+- **Protecting the shared keys** (there's no auth, which is a SPEC non-goal):
+  - a global daily run limit and a per-client cooldown, both configurable
+  - when the limit is reached, the UI shows pre-generated example reports (EN + AR) instead of starting a run
 - **Deploy instructions:** in `docs/deploy.md`.
 - **README:**
   - the problem
@@ -21,7 +27,7 @@ A public demo on Hugging Face Spaces (Docker SDK, free CPU tier) and a polished 
   - the eval results table
   - a Langfuse trace screenshot
   - a demo GIF
-  - limitations and next steps
+  - limitations and next steps (including the free-tier limits, temporary storage, and PyMuPDF's AGPL licence with pypdf as the alternative)
 
 ## Key files
 - `Dockerfile.space`
@@ -29,10 +35,10 @@ A public demo on Hugging Face Spaces (Docker SDK, free CPU tier) and a polished 
 - `README.md`
 - `docs/deploy.md`
 - `docs/assets/`
+- `examples/` (pre-generated reports)
 
 ## Definition of done
 The public demo URL works, and the README has the diagram, results table, screenshot and GIF.
 
 ## Open items
-- Image size and startup time with bge-m3 + torch on the free CPU tier (16GB RAM).
 - You record the GIF and take the screenshot; I'll give exact steps.
