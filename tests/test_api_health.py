@@ -1,9 +1,9 @@
-"""Tests for the placeholder API (/health, /metrics, startup key check) and the CLI stub."""
+"""Tests for the placeholder API: /health, /metrics and the startup key check."""
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app import __version__, cli
+from app import __version__
 from app.api import main
 from app.config import ConfigError
 
@@ -36,13 +36,3 @@ def test_startup_fails_fast_when_key_missing(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(main, "REQUIRED_KEYS", ("GROQ_API_KEY",))
     with pytest.raises(ConfigError, match="GROQ_API_KEY"), TestClient(main.app):
         pass
-
-
-def test_cli_stub_exits_zero() -> None:
-    assert cli.main() == 0
-
-
-def test_cli_fails_fast_when_key_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "REQUIRED_KEYS", ("GROQ_API_KEY",))
-    with pytest.raises(ConfigError, match="GROQ_API_KEY"):
-        cli.main()

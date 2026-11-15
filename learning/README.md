@@ -4,6 +4,7 @@ Simple explanations of what we have built so far. Read them in order.
 
 | # | File | What you learn | Time |
 |---|---|---|---|
+| 0 | [00-study-plan.md](00-study-plan.md) | **Start here:** 9 study sessions: what to read, which code holds the logic, hands-on commands, official docs | ~9 h total |
 | 1 | [01-big-picture.md](01-big-picture.md) | What the project is and how the parts fit together | 5 min |
 | 2 | [02-phase-1-foundation.md](02-phase-1-foundation.md) | Phase 1: tools, config, logging, data models, API, Docker, CI | 20 min |
 | 3 | [03-phase-2-docs-mcp.md](03-phase-2-docs-mcp.md) | Phase 2: MCP server, PDF extraction, NFKC, Arabic fixes, chunking, embeddings, Qdrant, ingest, Docker | 30 min |

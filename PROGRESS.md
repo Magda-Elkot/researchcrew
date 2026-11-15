@@ -1,7 +1,7 @@
 # Progress
 
 ## Current phase
-**Phase 2 (docs-mcp) complete locally, 2026-11-13; waiting for your review.** CI for Phase 2 runs when you push. Phase 1 is complete with green CI (30e1594, 93b30ab).
+**3 of 7 phases done (1, 2, 3; plus the 2b and 3a spikes), waiting for your review. Phase 3's Definition of Done is met; one exit check (a real Arabic run) waits for Groq's daily quota. Next: Phase 4 (FastAPI + SSE + Streamlit).**
 
 ## Done
 - 2026-11-13: plan reviewed against SPEC.md. Docs updated: PLAN.md, all phase docs, and the new phase-2b spike. Decisions recorded in DECISIONS.md.
@@ -31,15 +31,43 @@
 - [x] Every docs-mcp tool (and the resource) has passing unit tests.
 - [x] The server works with the MCP Inspector.
 
+- 2026-11-15: hardware checked (i7-13650HX, 31 GB RAM, RTX 3050 Laptop 6 GB, no NVIDIA driver yet). An on-prem LLM plan (Ollama, vLLM benchmark, SearXNG; DECISIONS #52–59) was drafted, then reverted the same day because the NVIDIA driver couldn't be installed (see Known issues). Kept: self-hosted Langfuse, all tracing in Phase 5 (DECISIONS #60).
+
+- 2026-11-15: Phase 3a done (DECISIONS #61–71).
+  - Config: Tavily key, MCP client settings, tool-result size limits; `require()` rejects `.env.example` placeholders.
+  - `app/tools/mcp.py`: server specs, `open_mcp_tools()` (skips a failing server, closes all on exit), `CompactTool` (required args only, hidden fixed args, shortened results). 154 tests passing; ruff + mypy clean.
+  - `scripts/spike_mcp.py bench`: adapter vs native (docs search 75 vs 202 ms; filesystem 2 vs 827 ms) → MCPServerAdapter, connections per job.
+  - `scripts/spike_mcp.py agent`: Llama 3.3 70B is gone from Groq → gpt-oss-120b. Found and fixed: strict tool schemas, null optional args, oversized results. Found for 3b: the model loops on tools without a budget and invents evidence when tools don't deliver.
+
+- 2026-11-15: Phase 3b done (DECISIONS #72–82).
+  - Plain-Python pipeline `run_research()`: Planner crew → main crew (one research task per sub-question with its own guarded tools → Analyst → Writer → Reviewer) → citation check → at most one revision.
+  - `guarded.py` (budgets, deadline, retry once, events, recording), `evidence.py` (verbatim check incl. "…" quotes; labelled-text answers), `report.py` (citation check, Markdown with RTL), `language.py`, `usage.py`, `pacing.py` (token pacing + capped retry waits), `limits.py`.
+  - CLI: `uv run researchcrew "question" [--depth] [--process]` → `outputs/<id>.json` + `.md`; exit codes 0/1/2.
+  - api image: Node 24 + pinned filesystem MCP server (1.61 GB), verified in the container.
+  - Real English run: completed, 7 evidence items, all sub-questions answered, 52K tokens, $0.012.
+  - 255 tests passing; ruff + mypy strict clean.
+
 ## Next
+- **You:** review Phases 3a + 3b and commit them.
+- Tomorrow (Groq quota): `uv run researchcrew "ما الذي يدفع نشر الطاقة المتجددة في دول مجلس التعاون الخليجي؟"` and record it (Arabic exit check).
+- Phase 4: detailed plan first (FastAPI jobs on SQLite, background runs, SSE from the progress events, Streamlit with RTL).
 - Optional, free: test the demo container over the internet with a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
-- Phase 3a (MCP spike with CrewAI).
 - Optional data top-up (manual browser download, see `data/SOURCES.md`): the UNESCO Recommendation full text (EN + AR) and an Arabic renewable-energy report. Then `make ingest`.
 - Parallel track (needs your approval): 25 eval questions with `expected_aspects`, covering the indexed topics.
 
 ## Known issues / risks
-- The Groq free-tier token/day limit means the eval will take several weeks (measured in Phase 3b).
+- gpt-oss-20b (tested as a second model, own 200K/day): Arabic path worked in one run (Arabic plan and queries, English chunks retrieved, first real web search), but the next run failed at the Planner: "Tool choice is required, but model did not call a tool" (structured output). gpt-oss-120b never failed there. If 20b becomes the Phase 6 comparison model, structured steps need one retry.
+- **Groq free tier: 200K tokens/day = ~4 quick reports/day.** The daily window is rolling; spikes and diagnostics count too. Phase 6 needs a plan (spread over days, or a second model with its own quota).
+- Reports cite only the PDF library so far: with "library first" the Researcher never needed web search in the real runs, and all citations came from one IRENA report. Citations show the doc_id, not page numbers yet.
+- The Researcher sometimes returns an evidence block with an empty snippet (dropped); the raw answer is now logged to find the cause.
+- `capped_retry_waits` patches a CrewAI internal (`crewai.llms.retry.get_retry_delay_seconds`); a test fails if CrewAI changes it.
+- The filesystem MCP server needs Node >= 24 (the image has it); this machine has Node 22, which works through npx but is unsupported.
+- Groq free tier for gpt-oss-120b: 8,000 tokens/min and 1,000 requests; one request may not exceed 8K tokens. A 5-agent run will be slow (minutes), and the eval will take many days (measured in Phase 3b).
+- gpt-oss-120b keeps calling tools unless a budget stops it, and invents citations when tools return nothing useful (DECISIONS #69–70).
+- The top search hits for "renewable energy jobs GCC" contain no jobs data: check eval questions against what the PDFs really cover.
 - Hierarchical mode may be unreliable; the fallback is a two-model comparison.
+- Self-hosted Langfuse needs ~4–6 GB RAM (6 containers); it lives in a compose profile and starts only when needed.
+- `apt update` fails on `https://archive.ubuntu.com` with "certificate issuer unknown" (clock, certificate store or HTTPS interception on the network; not investigated, your choice). Effects: apt packages can't be installed or updated (the NVIDIA driver install failed), and the same network may break Docker image pulls, e.g. for Langfuse. Bruno's apt repo also refuses connections.
 - HF Space: the docs-mcp spike fits locally; not yet verified on a real Space. The api + agents (Phase 3+) will add more RAM/CPU load.
 - This machine's `docker build` is the legacy builder (no buildx plugin), so no BuildKit cache mounts outside compose.
 - mcp is pinned below 2 because of crewai; revisit when crewai supports mcp 2.x.

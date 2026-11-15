@@ -27,7 +27,7 @@ The user submits a research question (English or Arabic). A crew of agents plans
 - Python 3.11+, uv for dependency management
 - CrewAI (hierarchical or sequential process with a manager agent)
 - MCP Python SDK: CrewAI connects to MCP servers as tools (use the crewai-tools MCP adapter)
-- LLM: provider-agnostic via LiteLLM; default Groq (Llama 3.3 70B), optional OpenAI/Gemini via env vars
+- LLM: provider-agnostic via LiteLLM; default Groq (gpt-oss-120b; Llama 3.3 70B was retired by Groq, DECISIONS #67), optional OpenAI/Gemini via env vars
 - FastAPI backend + a simple Streamlit or HTML frontend
 - Pydantic v2 for all agent outputs
 - Langfuse for tracing (OpenTelemetry/OpenInference instrumentation for CrewAI)
@@ -70,7 +70,7 @@ The user submits a research question (English or Arabic). A crew of agents plans
 - A make eval command runs the dataset, pushes scores to Langfuse and writes evals/results.md with a summary table. Compare at least 2 configurations (e.g. sequential vs hierarchical process, or two models).
 
 ## DEPLOYMENT
-- Dockerfiles for api, docs-mcp and frontend; docker-compose also starts Qdrant (and optionally self-hosted Langfuse).
+- Dockerfiles for api, docs-mcp and frontend; docker-compose also starts Qdrant and self-hosted Langfuse (Langfuse in its own compose profile, started only when needed; DECISIONS #60).
 - Multi-stage builds, non-root user, healthchecks, .env.example with every variable.
 - Deploy instructions for the free demo: a static page (HF static Space or GitHub Pages) and running the live system locally, optionally via a free Cloudflare quick tunnel (DECISIONS #50).
 
@@ -96,11 +96,12 @@ The user submits a research question (English or Arabic). A crew of agents plans
 - Web search MCP: Tavily (fallback: Brave). Filesystem MCP: read-only, limited to ./data.
 - Embeddings: BAAI/bge-m3 (dense vectors only, 1024 dims), cosine distance.
 - Qdrant collection name: "documents". Chunk size ~800 tokens, overlap ~100.
-- Generator model: Groq Llama 3.3 70B. Judge model: a DIFFERENT model
+- Generator model: Groq gpt-oss-120b (changed 2026-11-15: Groq retired Llama 3.3 70B; DECISIONS #67). Judge model: a DIFFERENT model
   (e.g. Gemini) to reduce self-grading bias.
 - Job storage: SQLite for jobs and results (no Redis/Celery in v1).
 - Frontend: Streamlit (single page).
-- Observability: Langfuse Cloud (free Hobby plan) by default; self-hosting is optional.
+- Observability: **self-hosted Langfuse** (docker compose `observability` profile;
+  changed 2026-11-15, DECISIONS #60).
 - Demo: **free tools only, no card.** A free static page (Hugging Face static Space or GitHub Pages) with example reports, results, screenshots and a GIF; the live system runs locally with docker compose; for live demos, a temporary free Cloudflare quick tunnel. Changed 2026-11-13: HF Docker Spaces now need a paid plan, Cloud Run needs a card (DECISIONS #48–50).
 - Pin all dependency versions in Phase 1; record them in DECISIONS.md.
 

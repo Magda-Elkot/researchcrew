@@ -1,6 +1,15 @@
 # ResearchCrew API image (multi-stage, non-root).
 # Builder installs the locked `api` group into /app/.venv; runtime copies only that venv.
 # Both stages use the same base image so the venv's Python path is identical.
+# A Node stage installs the pinned filesystem MCP server; runtime copies only `node` and the
+# server, so agents start it as a local command (no npx download at run time; DECISIONS #76).
+
+# ---- filesystem MCP server (Node) ---------------------------------------------
+# node:24-bookworm-slim = Node v24.22.3, pinned by digest (the server needs Node >= 24).
+FROM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS mcp-fs
+ARG FILESYSTEM_MCP_PACKAGE=@modelcontextprotocol/server-filesystem@2.3.0
+RUN npm install --global --prefix /opt/mcp-fs --omit=dev "$FILESYSTEM_MCP_PACKAGE" \
+    && npm cache clean --force
 
 # ---- builder -------------------------------------------------------------------
 FROM python:3.12-slim AS builder
@@ -29,10 +38,15 @@ FROM python:3.12-slim AS runtime
 RUN useradd --create-home --uid 10001 app
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
+COPY --from=mcp-fs /usr/local/bin/node /usr/local/bin/node
+COPY --from=mcp-fs /opt/mcp-fs /opt/mcp-fs
+# The CLI writes reports here (the API uses SQLite from Phase 4).
+RUN mkdir -p /app/outputs && chown app:app /app/outputs
 
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/app/.venv/bin:/opt/mcp-fs/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    FILESYSTEM_MCP_COMMAND=mcp-server-filesystem
 
 USER app
 EXPOSE 8000

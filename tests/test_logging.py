@@ -85,3 +85,10 @@ def test_token_and_secret_fields_are_redacted_but_counts_kept() -> None:
     for key in ("hf_token", "access_token", "token", "langfuse_secret"):
         assert data[key] == REDACTED
     assert (data["total_tokens"], data["max_tokens"]) == (42, 1024)
+
+
+def test_reserved_extra_keys_are_renamed_not_fatal(capsys: pytest.CaptureFixture[str]) -> None:
+    # `args` and `process` are LogRecord attributes; plain logging raises KeyError for them.
+    get_logger("reserved").warning("x", extra={"args": "a", "process": "p", "job_id": "j"})
+    data = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert (data["args_"], data["process_"], data["job_id"]) == ("a", "p", "j")

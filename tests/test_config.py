@@ -11,7 +11,7 @@ from app.config import ConfigError, Settings, get_settings, require, secret_valu
 
 def test_defaults() -> None:
     settings = get_settings()
-    assert settings.llm_model == "groq/llama-3.3-70b-versatile"
+    assert settings.llm_model == "groq/openai/gpt-oss-120b"
     assert settings.groq_api_key is None
     assert settings.qdrant_url == "http://localhost:6333"
     assert settings.qdrant_collection == "documents"
@@ -52,6 +52,22 @@ def test_require_treats_empty_as_missing(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("GROQ_API_KEY", "")
     with pytest.raises(ConfigError, match="GROQ_API_KEY"):
         require("GROQ_API_KEY")
+
+
+@pytest.mark.parametrize("value", ["your-groq-api-key-here", "  YOUR-Tavily-Key-HERE "])
+def test_require_rejects_env_example_placeholder(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", value)
+    with pytest.raises(ConfigError, match="GROQ_API_KEY still has the placeholder value"):
+        require("GROQ_API_KEY")
+
+
+def test_require_accepts_real_looking_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Only the full `your-...-here` shape is a placeholder.
+    monkeypatch.setenv("GROQ_API_KEY", "your-real-key")
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-here")
+    require("GROQ_API_KEY", "TAVILY_API_KEY")
 
 
 def test_require_rejects_unknown_name() -> None:
@@ -102,6 +118,45 @@ def test_invalid_numbers_are_rejected(
     monkeypatch: pytest.MonkeyPatch, name: str, value: str
 ) -> None:
     monkeypatch.setenv(name, value)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_mcp_client_defaults() -> None:
+    settings = get_settings()
+    assert settings.tavily_api_key is None
+    assert settings.tavily_mcp_url == "https://mcp.tavily.com/mcp/"
+    assert settings.docs_mcp_url == "http://127.0.0.1:8001/mcp"
+    assert settings.notes_dir == "data/notes"
+    assert settings.filesystem_mcp_package == "@modelcontextprotocol/server-filesystem@2.3.0"
+    assert settings.filesystem_mcp_command == "npx"
+    assert settings.mcp_connect_timeout == 30
+    assert settings.mcp_search_top_k == 3
+    assert settings.mcp_max_item_chars == 1200
+    assert settings.mcp_max_result_chars == 6000
+
+
+def test_run_defaults() -> None:
+    settings = get_settings()
+    assert settings.llm_temperature == 0.2
+    assert settings.llm_tokens_per_minute == 8000
+    assert settings.llm_timeout_s == 90
+    assert settings.llm_num_retries == 1
+    assert settings.llm_max_retry_wait_s == 60
+    assert settings.run_timeout_s == 900
+    assert settings.max_tool_calls == 25
+    assert settings.outputs_dir == "outputs"
+
+
+def test_tavily_key_is_a_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-very-secret")
+    settings = get_settings()
+    assert "tvly-very-secret" not in repr(settings)
+    assert "tvly-very-secret" in secret_values()
+
+
+def test_mcp_connect_timeout_must_be_positive(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_CONNECT_TIMEOUT", "0")
     with pytest.raises(ValidationError):
         Settings()
 

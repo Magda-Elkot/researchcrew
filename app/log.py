@@ -5,12 +5,16 @@ Redaction has two layers:
 1. Field names that look like secrets (e.g. `groq_api_key`, `password`) are replaced.
    Token *counts* such as `prompt_tokens` are deliberately kept (SPEC needs them).
 2. Every string is scrubbed of loaded secret values and of secret URL query params.
+
+`extra=` keys that clash with LogRecord's own attributes (`args`, `process`, `name`, ...) are
+renamed with a trailing underscore instead of crashing the log call (it happened three times).
 """
 
 import json
 import logging
 import re
 import sys
+from collections.abc import MutableMapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -104,7 +108,22 @@ def _configure() -> None:
     _configured = True
 
 
-def get_logger(name: str) -> logging.Logger:
+class SafeExtraAdapter(logging.LoggerAdapter[logging.Logger]):
+    """Renames `extra` keys that LogRecord reserves (`process` -> `process_`)."""
+
+    def process(
+        self, msg: Any, kwargs: MutableMapping[str, Any]
+    ) -> tuple[Any, MutableMapping[str, Any]]:
+        extra = kwargs.get("extra")
+        if extra:
+            kwargs["extra"] = {
+                (f"{key}_" if key in _STANDARD_ATTRS else key): value
+                for key, value in extra.items()
+            }
+        return msg, kwargs
+
+
+def get_logger(name: str) -> SafeExtraAdapter:
     """Return a logger that writes structured JSON to stdout."""
     _configure()
-    return logging.getLogger(name)
+    return SafeExtraAdapter(logging.getLogger(name))

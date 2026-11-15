@@ -8,6 +8,10 @@ ResearchCrew is a portfolio project: a multi-agent research assistant built with
 A user asks a research question in English or Arabic. Five agents (Planner, Researcher, Analyst,
 Writer, Reviewer) produce a cited Markdown report. MCP is the centrepiece:
 - **Ready-made servers:** Tavily web search and the filesystem server.
+
+> **2026-11-15: Langfuse is self-hosted (DECISIONS #60).** It runs locally in a compose `observability` profile,
+> and all tracing is added in Phase 5. Mentions of "Langfuse Cloud" below are superseded. (A short on-prem-LLM plan,
+> #52–59, was reverted the same day.)
 - **Our own server:** `docs-mcp`, built in Python with FastMCP. It does semantic search over local PDFs stored in Qdrant, using bge-m3 embeddings.
 
 ## Resolved decisions
@@ -46,7 +50,7 @@ These supplement the DECISIONS section of SPEC.md. They are also recorded in [..
   - The filesystem MCP server is MIT.
   - PyMuPDF is **AGPL**: free and open source, but copyleft. That's fine for a public repo. The README will name pypdf (BSD) as the permissive alternative.
 - **Free tiers of hosted services (API key needed, no card):**
-  - Groq: serves Llama 3.3 70B, which is open-weights under the Llama license. The free tier is the main bottleneck (~100K tokens/day; check current limits in the Groq console).
+  - Groq: serves gpt-oss-120b (open weights, Apache 2.0); Llama 3.3 70B was retired (DECISIONS #67). The free tier is the main bottleneck (8K tokens/min, 1,000 requests; check current limits in the Groq console).
   - Gemini: the judge model.
   - Tavily: about 1,000 credits/month.
   - Langfuse Cloud Hobby: Langfuse itself is MIT and can be self-hosted instead.
@@ -64,9 +68,9 @@ SPEC's definitions of done are unchanged.
 | 2 | docs-mcp server + ingestion + tests | [phase-2-docs-mcp.md](phase-2-docs-mcp.md) | `ingest` indexes data/pdfs; every tool has passing tests; works in MCP Inspector |
 | 2b | Spike: hosting feasibility | [phase-2b-space-spike.md](phase-2b-space-spike.md) | One demo container (docs-mcp + Qdrant + model + snapshot) answers searches under small-host limits; size, RAM, startup recorded; free hosting decision made |
 | 3a | Spike: MCP connectivity from CrewAI | [phase-3-crew.md](phase-3-crew.md#phase-3a--mcp-connectivity-spike) | One agent calls docs-mcp, Tavily and filesystem tools from the CLI; adapter lifecycle decided; tokens per call measured |
-| 3b | Full crew + Flow + guardrails + CLI | [phase-3-crew.md](phase-3-crew.md#phase-3b--full-crew) | `uv run researchcrew "question"` produces valid Report JSON + Markdown; tokens, cost and a basic trace recorded |
+| 3b | Full crew + Flow + guardrails + CLI | [phase-3-crew.md](phase-3-crew.md#phase-3b--full-crew) | `uv run researchcrew "question"` produces valid Report JSON + Markdown; tokens and cost recorded |
 | 4 | FastAPI + SSE + Streamlit | [phase-4-api-ui.md](phase-4-api-ui.md) | POST/GET work; frontend shows live SSE progress and the report |
-| 5 | Langfuse tracing (complete) | [phase-5-langfuse.md](phase-5-langfuse.md) | One trace per run with agent, tool and LLM spans, tokens and cost |
+| 5 | Self-hosted Langfuse + tracing | [phase-5-langfuse.md](phase-5-langfuse.md) | Langfuse runs locally (`observability` profile); one trace per run with agent, tool and LLM spans, tokens and cost |
 | 6 | Evaluation suite | [phase-6-evals.md](phase-6-evals.md) | `make eval` runs the dataset for 2 configs and writes evals/results.md |
 | 7 | Deployment + README | [phase-7-deploy.md](phase-7-deploy.md) | Public demo URL works; README has diagram, results, screenshot, GIF |
 

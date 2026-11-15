@@ -96,4 +96,6 @@ addopts = "-ra"
 filterwarnings = [
     # Tests use qdrant-client's in-memory mode, which ignores payload indexes (expected).
     "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",
+    # CrewAI warns about its own deprecated internals (options we never set).
+    "ignore::DeprecationWarning:crewai.*",
 ]
