@@ -3,7 +3,8 @@
 Plain Python around the crews, so every decision is visible and testable:
 detect the language → plan (trimmed to the depth's size) → research, analyse, write, review →
 citation check merged into the review → at most one revision → mark sub-questions without
-evidence → sum tokens and cost. Any error ends the run as `failed` with a readable message.
+evidence → sum tokens and cost. Any error ends the run as `failed` with a readable message
+(`errors.readable_error`).
 
 The crews themselves are behind the `Steps` protocol: `CrewSteps` runs CrewAI, tests pass
 a fake.
@@ -20,6 +21,7 @@ from pydantic import Field
 
 from app.agents.agents import build_llm
 from app.agents.crew import CrewSteps, MainOutput
+from app.agents.errors import readable_error
 from app.agents.limits import LIMITS, DepthLimits
 from app.agents.pacing import capped_retry_waits, paced_llm_calls
 from app.agents.report import check_citations
@@ -198,7 +200,7 @@ def run_research(
     except Exception as exc:
         logger.exception("run failed", extra={"job_id": job_id})
         result.status = "failed"
-        result.error = f"{type(exc).__name__}: {str(exc)[:500]}"
+        result.error = readable_error(exc)  # the full error is in the log above
         guard.emit("job_failed", result.error)
 
     if used_steps is not None:

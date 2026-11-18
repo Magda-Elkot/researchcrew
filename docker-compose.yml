@@ -15,10 +15,26 @@ services:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     volumes:
       - ./data:/app/data:ro
+      # SQLite job store (jobs, results, progress events) survives restarts.
+      - jobs_db:/app/var
     depends_on:
       qdrant:
         condition: service_healthy
       docs-mcp:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    image: researchcrew-frontend:dev
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-8501}:8501"
+    depends_on:
+      api:
         condition: service_healthy
     restart: unless-stopped
 
@@ -71,3 +87,4 @@ services:
 volumes:
   qdrant_storage:
   model_cache:
+  jobs_db:

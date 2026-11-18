@@ -20,9 +20,11 @@
 - Install: `uv sync --all-groups` (or `make install`)
 - Run tests: `uv run pytest` (or `make test`)
 - Lint/format: `uv run ruff check . --fix && uv run ruff format .` (or `make format`; `make lint` only checks)
-- Type check: `uv run mypy app mcp_servers` (or `make typecheck`)
+- Type check: `uv run mypy app mcp_servers frontend` (or `make typecheck`)
 - Everything CI runs except Docker: `make check`
-- Start everything: `docker compose up --build` (or `make up` detached; `make down` stops)
+- Start everything: `docker compose up --build` (or `make up` detached; `make down` stops) → UI http://localhost:8501, API http://localhost:8000/docs
+- API locally (needs docs-mcp + Qdrant + keys): `make api` (one worker); then `curl -X POST localhost:8000/research -H 'content-type: application/json' -d '{"question":"...","depth":"quick"}'`, `curl localhost:8000/research/<id>`, live progress `curl -N localhost:8000/research/<id>/events`
+- Frontend locally (needs the API): `make frontend` → http://localhost:8501
 - Research CLI (needs Qdrant + docs-mcp + GROQ_API_KEY + TAVILY_API_KEY): `uv run researchcrew "question" [--depth quick|deep] [--process sequential|hierarchical]` → `outputs/<id>.json` + `.md`
 - Index PDFs: `uv run ingest data/pdfs` (or `make ingest`; `--force` re-embeds unchanged files)
 - docs-mcp server: `uv run docs-mcp` (or `make docs-mcp`; MCP at http://127.0.0.1:8001/mcp)

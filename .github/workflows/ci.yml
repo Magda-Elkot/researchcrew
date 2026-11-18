@@ -26,7 +26,7 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Mypy
-        run: uv run mypy app mcp_servers
+        run: uv run mypy app mcp_servers frontend
 
       - name: Pytest
         run: uv run pytest
@@ -55,3 +55,12 @@ jobs:
           push: false
           cache-from: type=gha,scope=docs-mcp
           cache-to: type=gha,mode=max,scope=docs-mcp
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/frontend.Dockerfile
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend

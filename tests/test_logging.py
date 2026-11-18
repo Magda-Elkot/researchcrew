@@ -92,3 +92,9 @@ def test_reserved_extra_keys_are_renamed_not_fatal(capsys: pytest.CaptureFixture
     get_logger("reserved").warning("x", extra={"args": "a", "process": "p", "job_id": "j"})
     data = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert (data["args_"], data["process_"], data["job_id"]) == ("a", "p", "j")
+
+
+def test_chatty_libraries_only_log_warnings() -> None:
+    get_logger("x")
+    for name in ("LiteLLM", "mcp.client.streamable_http", "httpx"):
+        assert logging.getLogger(name).level == logging.WARNING

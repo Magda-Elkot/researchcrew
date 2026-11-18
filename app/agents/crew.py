@@ -7,6 +7,7 @@
 - `revise`: a one-task crew for the single allowed rewrite.
 """
 
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -29,6 +30,12 @@ from app.schemas import (
     ReviewResult,
 )
 from app.tools.guarded import RunGuard, guarded_tools
+
+# Our task callback and guardrails are closures over one run's state. CrewAI warns that it can't
+# save them in a checkpoint; we never use checkpoints, so that warning is only noise (#88).
+warnings.filterwarnings(
+    "ignore", message=r"A \w+ callback cannot be saved in a checkpoint", category=UserWarning
+)
 
 
 class StepError(RuntimeError):

@@ -1,7 +1,7 @@
 # Progress
 
 ## Current phase
-**3 of 7 phases done (1, 2, 3; plus the 2b and 3a spikes), waiting for your review. Phase 3's Definition of Done is met; one exit check (a real Arabic run) waits for Groq's daily quota. Next: Phase 4 (FastAPI + SSE + Streamlit).**
+**4 of 7 phases done (1, 2, 3, 4; plus the 2b and 3a spikes), waiting for your review: one manual check left, a question asked in the browser (live progress + report). Next: Phase 5 (Langfuse tracing).**
 
 ## Done
 - 2026-11-13: plan reviewed against SPEC.md. Docs updated: PLAN.md, all phase docs, and the new phase-2b spike. Decisions recorded in DECISIONS.md.
@@ -46,18 +46,36 @@
   - api image: Node 24 + pinned filesystem MCP server (1.61 GB), verified in the container.
   - Real English run: completed, 7 evidence items, all sub-questions answered, 52K tokens, $0.012.
   - 255 tests passing; ruff + mypy strict clean.
+- 2026-11-16: Phase 4 done (DECISIONS #85–89).
+  - `app/api/jobs.py`: SQLite job + event store (WAL, conditional status updates, final event saved with the result, timeout on read, restart cleanup).
+  - `app/api/runner.py`: one job at a time in a worker thread; later jobs `queued`.
+  - `app/api/routes.py`: `POST /research` (202), `GET /research/{id}` (+ `report_markdown`), `GET /research/{id}/events` (FastAPI built-in SSE, `Last-Event-ID` resume). Startup requires GROQ/TAVILY keys.
+  - `app/agents/errors.py`: readable provider errors; LiteLLM/MCP INFO logs and CrewAI's checkpoint warning silenced.
+  - `frontend/`: `client.py` (SSE parsing, reconnect) + `streamlit_app.py` (live feed, metrics, report, RTL via CSS, Markdown download).
+  - Docker: frontend image (591 MB, non-root, healthcheck), compose service on 127.0.0.1:8501, `jobs_db` volume; CI builds it; `make api`, `make frontend`.
+  - Real run through the API: 21 live SSE events, completed, 6 citations, 45.8K tokens, $0.0095, 340 s; the page rendered it (AppTest against the live API). Whole compose stack healthy.
+  - Bugs found by the checks and fixed: the SSE parser waited for the whole stream; `frontend/app.py` shadowed the `app` package under Streamlit; local Streamlit listened on all interfaces.
+  - 303 tests passing; ruff + mypy strict (now incl. `frontend`) clean.
+- 2026-11-16: Phase 3 Arabic exit check (DECISIONS #84): completed on gpt-oss-120b; Arabic RTL report with citations, cross-lingual search into an English PDF, an honest "no evidence" for sq1; 53K tokens, $0.011, 428 s.
 
 ## Next
-- **You:** review Phases 3a + 3b and commit them.
-- Tomorrow (Groq quota): `uv run researchcrew "ما الذي يدفع نشر الطاقة المتجددة في دول مجلس التعاون الخليجي؟"` and record it (Arabic exit check).
-- Phase 4: detailed plan first (FastAPI jobs on SQLite, background runs, SSE from the progress events, Streamlit with RTL).
+- **You:** ask one question in the browser (http://127.0.0.1:8501 with `make api` + `make frontend`, or `make up`), then review and commit Phase 4.
+- Phase 5: detailed plan first (self-hosted Langfuse in the `observability` profile; one trace per run, spans per agent/tool/LLM call, tokens and cost, tags).
 - Optional, free: test the demo container over the internet with a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
 - Optional data top-up (manual browser download, see `data/SOURCES.md`): the UNESCO Recommendation full text (EN + AR) and an Arabic renewable-energy report. Then `make ingest`.
 - Parallel track (needs your approval): 25 eval questions with `expected_aspects`, covering the indexed topics.
 
 ## Known issues / risks
+- CrewAI calls `load_dotenv()` when imported (`crewai/llm.py`): python-dotenv searches upward from CrewAI's own folder, so the project `.env` is loaded into the environment even when a command runs from another folder. Harmless (our settings read the same `.env`), but a "missing key" test only works without that file (found in the 2026-11-16 review).
+- When the filesystem MCP server can't start (e.g. no `data/notes` in the working folder), it is skipped correctly, but only after the full `MCP_CONNECT_TIMEOUT` (30 s).
+- gpt-oss on Groq sometimes answers a structured step (Writer `Report`) by calling a non-existent tool (`report`), like the `json` case (#75); CrewAI recovered in the run, but it costs one extra call.
+- Jobs run one at a time: a second question waits until the first is done (~5–10 min each on the free tier).
+- `make up` publishes the UI on 8501 and the API on 8000; if you run `make api`/`make frontend` locally at the same time, set `API_HOST_PORT`/`FRONTEND_HOST_PORT`/`DOCS_MCP_HOST_PORT` to other ports.
 - gpt-oss-20b (tested as a second model, own 200K/day): Arabic path worked in one run (Arabic plan and queries, English chunks retrieved, first real web search), but the next run failed at the Planner: "Tool choice is required, but model did not call a tool" (structured output). gpt-oss-120b never failed there. If 20b becomes the Phase 6 comparison model, structured steps need one retry.
 - **Groq free tier: 200K tokens/day = ~4 quick reports/day.** The daily window is rolling; spikes and diagnostics count too. Phase 6 needs a plan (spread over days, or a second model with its own quota).
+- With 2 tool calls per sub-question (quick), the Researcher uses search_documents + get_document, so when the library has nothing it never reaches web search (Arabic run, sq1). Candidate fix in Phase 4/6: tell it to try the web when the search finds nothing, or drop get_document in quick mode.
+- The References list repeats one document once per evidence item (no merging, no page numbers).
+- docs-mcp run in a terminal must stay in the foreground: Ctrl+Z suspends it, and it keeps port 8001 but never answers (curl hangs). Use `fg` to resume, or Ctrl+C to stop.
 - Reports cite only the PDF library so far: with "library first" the Researcher never needed web search in the real runs, and all citations came from one IRENA report. Citations show the doc_id, not page numbers yet.
 - The Researcher sometimes returns an evidence block with an empty snippet (dropped); the raw answer is now logged to find the cause.
 - `capped_retry_waits` patches a CrewAI internal (`crewai.llms.retry.get_retry_delay_seconds`); a test fails if CrewAI changes it.
@@ -72,7 +90,7 @@
 - This machine's `docker build` is the legacy builder (no buildx plugin), so no BuildKit cache mounts outside compose.
 - mcp is pinned below 2 because of crewai; revisit when crewai supports mcp 2.x.
 - Starlette warns that `TestClient` with `httpx` is deprecated in favour of `httpx2`. Harmless for now; switching would add a library, so it needs approval.
-- uvicorn's own access logs are not JSON yet (planned for Phase 4).
+- uvicorn's own access logs are not JSON yet (moved to Phase 5 with the tracing work).
 - On this machine port 6333 is used by another Qdrant (`de-rs`), so the local `.env` sets `QDRANT_HOST_PORT=6335` and `QDRANT_URL=http://localhost:6335`.
 - Sample data is thinner than planned (5 PDFs, not 10–15; AI ethics only a 2-page flyer; no Arabic energy document), because several publishers block scripted downloads.
 - The UNESCO flyer has no licence statement, so it's git-ignored until confirmed.

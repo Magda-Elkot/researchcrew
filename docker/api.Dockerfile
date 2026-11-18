@@ -40,8 +40,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=mcp-fs /usr/local/bin/node /usr/local/bin/node
 COPY --from=mcp-fs /opt/mcp-fs /opt/mcp-fs
-# The CLI writes reports here (the API uses SQLite from Phase 4).
-RUN mkdir -p /app/outputs && chown app:app /app/outputs
+# The CLI writes reports to outputs/; the API keeps its SQLite job store in var/ (a volume).
+RUN mkdir -p /app/outputs /app/var && chown app:app /app/outputs /app/var
 
 ENV PATH="/app/.venv/bin:/opt/mcp-fs/bin:$PATH" \
     PYTHONUNBUFFERED=1 \

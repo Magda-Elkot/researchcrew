@@ -43,8 +43,11 @@ def check_citations(report: Report, evidence_ids: set[str]) -> list[str]:
     return issues
 
 
-def to_markdown(report: Report) -> str:
-    """The report as Markdown; Arabic reports are wrapped for right-to-left display."""
+def to_markdown(report: Report, rtl_wrapper: bool = True) -> str:
+    """The report as Markdown; Arabic reports are wrapped for right-to-left display.
+
+    The API passes `rtl_wrapper=False`: the frontend sets the direction itself and never renders
+    HTML from the report (DECISIONS #89)."""
     lines = [f"# {report.title}", "", report.executive_summary, ""]
     for section in report.sections:
         lines += [f"## {section.heading}", "", section.body_markdown, ""]
@@ -61,6 +64,6 @@ def to_markdown(report: Report) -> str:
         title = f"{c.title}, " if c.title else ""
         lines.append(f"[{c.number}] {title}{c.source}  ")
     body = "\n".join(lines).rstrip() + "\n"
-    if report.language == "ar":
+    if report.language == "ar" and rtl_wrapper:
         return f'<div dir="rtl">\n\n{body}\n</div>\n'
     return body

@@ -84,6 +84,17 @@ class Settings(BaseSettings):
     # Where the CLI writes <id>.json and <id>.md.
     outputs_dir: str = "outputs"
 
+    # --- API jobs (Phase 4) ---
+    # SQLite file holding jobs, results and progress events (created on first start).
+    jobs_db_path: str = "var/jobs.db"
+    # Crew runs at the same time. Keep 1 on free tiers: runs share one tokens-per-minute limit,
+    # and the LLM pacing is process-wide (DECISIONS #86).
+    max_concurrent_jobs: int = Field(default=1, ge=1)
+    # How often the SSE stream checks the database for new events.
+    sse_poll_interval_s: float = Field(default=0.5, gt=0)
+    # Extra seconds after RUN_TIMEOUT_S before a still-running job is marked failed.
+    job_timeout_grace_s: int = Field(default=60, ge=0)
+
     @model_validator(mode="after")
     def _overlap_smaller_than_chunk(self) -> Self:
         if self.chunk_overlap >= self.chunk_tokens:

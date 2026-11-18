@@ -32,3 +32,6 @@ models/*
 
 # Reports written by the CLI (Phase 3b)
 outputs/
+
+# SQLite job store of the API (Phase 4)
+var/

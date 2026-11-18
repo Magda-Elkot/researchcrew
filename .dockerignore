@@ -15,3 +15,4 @@ evals
 *.md
 models
 outputs/
+var/
