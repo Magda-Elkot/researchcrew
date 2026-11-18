@@ -1,42 +1,62 @@
 # Phase 6 — Evaluation suite and results
 
-**Status:** high-level. This gets a detailed plan when the phase starts. [Back to master plan](PLAN.md)
+**Status:** detailed plan (2026-11-18), waiting for the Gemini key and free disk space.
+[Back to master plan](PLAN.md)
 
 ## Goal
-Measure report quality and cost, comparing 2 configurations: **sequential vs hierarchical** process.
+Measure report quality, tool reliability, latency and cost on a fixed question set, for two
+configurations, and publish the numbers (`evals/results.md`, Langfuse scores).
 
-**Fallback:** if the hierarchical config can't reliably finish runs (the manager's delegation fails or loops on the free tier),
-switch to **two generator models** on the sequential crew. SPEC allows either. The switch and its reason are recorded in DECISIONS.md.
+## Your decisions (2026-11-18, DECISIONS #98–100)
+- **Judge:** Gemini Flash through LiteLLM (`GEMINI_API_KEY`, free AI Studio key; the exact
+  model is chosen from your project's free-tier limits). A different provider and model family
+  from the generator.
+- **Comparison:** sequential vs hierarchical (both gpt-oss-120b, SPEC decision #2). Fallback if
+  hierarchical can't finish runs reliably: two generator models (recorded if used).
+- **Data:** the dataset is written on the 5 indexed PDFs + `data/notes` now; questions are added
+  if you add PDFs before the full run.
 
-## Scope
-- **Dataset:** `evals/dataset.jsonl` with **25 questions** (the SPEC minimum; English + Arabic) covering the sample PDF and notes topics. It's drafted on the parallel track during Phase 1 and uploaded as a Langfuse dataset. Each line is:
-  `{id, question, language, expected_aspects: [3–5 reference key points]}`
-- **Metrics per run:**
-  - Citation coverage: an automatic check of the share of claims with a valid `[n]` → Citation → Evidence chain. Claims are split on `.`, `?`, `!`, `؟` and list items; headings are skipped.
-  - Faithfulness, scored 1–5: an LLM judge (Gemini, a different model from the generator) checks each claim against the **raw tool output** behind its cited evidence, not against the LLM-written snippet.
-  - Completeness, scored 1–5: the same judge checks the report against the dataset's `expected_aspects`. Coverage of the Planner's sub-questions is a secondary check.
-  - Tool-call success rate and average tool calls per run, taken from the guarded-tool records.
-  - Latency p50/p95 and cost per report.
-- **Scores are attached** to the Langfuse traces.
-- **`make eval`:**
-  - Runs both configs at quick depth.
-  - Concurrency is configurable, with backoff on 429 responses.
-  - **Resumable:** progress is saved per question and config in `evals/runs/`, so a run can span several weeks within free-tier limits.
-  - **Tavily cache:** results are cached per eval question, so reruns don't spend credits.
-  - Writes `evals/results.md` with a summary table.
-- **Hierarchical config:** built by the Phase 3b crew factory with `Process.hierarchical` + `manager_llm`. Same agents and tasks.
+## Budget (measured, not guessed)
+A quick run is ~45–53K tokens (Phases 3–5: 52.4K, 53.0K, 45.8K, 49.1K, 50.9K). Hierarchical adds
+the manager's calls (measured in the pilot). 25 questions × 2 configs ≈ 2.5–3M tokens against
+200K tokens/day for gpt-oss-120b ⇒ **~13–16 days** of runs. So the runner is **resumable**:
+each (question, config) result is a file in `evals/runs/`, `make eval` skips finished ones,
+and it stops cleanly (no failed results saved) when Groq's daily limit is reached.
 
-## Key files
-- `evals/{dataset.jsonl, run.py, metrics.py, judge.py, report.py}`
+## Metrics per run
+| Metric | How | Where |
+|---|---|---|
+| Citation coverage | share of report sentences with a valid `[n]` → Citation → kept Evidence chain; sentences split on `. ? ! ؟` and list items; headings and the "no evidence" note skipped | `evals/metrics.py` (pure Python) |
+| Faithfulness 1–5 | the judge reads each cited claim with the **raw tool output** its evidence came from (not the snippet) | `evals/judge.py` |
+| Completeness 1–5 | the judge reads the report and the question's `expected_aspects` | `evals/judge.py` |
+| Tool-call success rate, tool calls per run | the guarded-tool records (executed calls; refused "budget used up" requests counted separately) | `evals/metrics.py` |
+| Latency p50/p95, cost per report, tokens | `RunResult` | `evals/report.py` |
+
+## Design
+- **`evals/dataset.jsonl`:** 25 questions (≈13 EN, 12 AR) `{id, question, language, topic,
+  expected_aspects: [3–5 key points]}`, each answerable from the indexed documents. Uploaded as a
+  Langfuse dataset (`researchcrew-eval`).
+- **Raw tool outputs:** `RunResult` gains the run's tool records (tool, ok, output, scope), so the
+  judge can check claims against what the tools really returned. The API keeps returning only
+  the SPEC fields.
+- **`evals/run.py` (`make eval`):** for each config and question not yet in `evals/runs/`:
+  `run_research` (traced, environment `eval`, tag `config:`) → metrics → judge → save → Langfuse
+  scores on the run's trace + dataset run item. Concurrency 1 by default (one Groq quota);
+  judge calls retry with backoff on 429.
+- **`evals/report.py`:** `evals/results.md` with one row per config (means, p50/p95, cost, n),
+  plus per-question details.
+- **No Tavily cache** (was planned): web search is rarely used and Tavily's free credits cover
+  the whole eval; a cache would add code for nothing.
+
+## Steps
+1. Pilot first (cheap): judge + metrics + runner on 2 questions × 2 configs, to measure the
+   hierarchical token cost and check it finishes.
+2. Dataset (25 questions) + Langfuse dataset upload.
+3. Full run over the following days (`make eval` once a day), then `evals/results.md`.
 
 ## Tests
-- The metrics functions, with fixtures (including Arabic sentence splitting).
-- The judge prompt parsing, with the LLM mocked.
-- Resume logic.
+Metrics with fixtures (incl. Arabic sentence splitting), judge prompt/answer parsing with the LLM
+mocked, resume logic, budget stop, Langfuse score calls mocked.
 
 ## Definition of done
 `make eval` runs the full dataset for 2 configs and writes evals/results.md.
-
-## Open items
-- 25 questions × 2 configs = 50 runs. At ~30–80K tokens per quick run against ~100K tokens/day on Groq's free tier, that is expected to take **several weeks**. The Phase 3b token measurements will give a firmer estimate.
-- Gemini free-tier limits for the judge (checked when the phase starts).

@@ -1,5 +1,6 @@
 """Tests for app.config: env loading, defaults and require()."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from pydantic import ValidationError
 
 from app import __version__
 from app.config import ConfigError, Settings, get_settings, require, secret_values
+from frontend.client import FrontendSettings
 
 
 def test_defaults() -> None:
@@ -167,3 +169,11 @@ def test_embedding_threads_zero_means_all_cores(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("EMBEDDING_THREADS", "-1")
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_every_setting_is_documented_in_env_example() -> None:
+    # CLAUDE.md: all variables go in .env.example (a Phase 5 setting was once forgotten).
+    example = (Path(__file__).parents[1] / ".env.example").read_text(encoding="utf-8")
+    documented = set(re.findall(r"^([A-Z_][A-Z0-9_]*)=", example, re.MULTILINE))
+    fields = {*Settings.model_fields, *FrontendSettings.model_fields}
+    assert {name.upper() for name in fields} - documented == set()

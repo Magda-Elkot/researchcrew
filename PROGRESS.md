@@ -1,7 +1,7 @@
 # Progress
 
 ## Current phase
-**5 of 7 phases done (1–5; plus the 2b and 3a spikes), waiting for your review (Phase 5 not committed yet). Next: Phase 6 (evaluation suite).**
+**5 of 7 phases done (1–5, all committed, CI green). Phase 6 planned (docs/phase-6-evals.md); waiting for a Gemini key.**
 
 ## Done
 - 2026-11-13: plan reviewed against SPEC.md. Docs updated: PLAN.md, all phase docs, and the new phase-2b spike. Decisions recorded in DECISIONS.md.
@@ -50,7 +50,7 @@
   - Self-hosted Langfuse 4.80.0 in compose profile `observability` (web, worker, Postgres, ClickHouse, Redis, MinIO; pinned; only the UI published on 127.0.0.1:3000); `make langfuse-env` (random secrets + headless-init keys into `.env`), `make langfuse-up` / `langfuse-down`.
   - `app/observability.py`: tracing on only with Langfuse keys; CrewAI + LiteLLM instrumented; one root span per run with tags depth/model/process/version and the job id; `trace_id` on `RunResult`, in `GET /research/{id}` (+ `trace_url`) and on every log line inside a run.
   - uvicorn logs as JSON. Bug fixed: Docker images installed a stale build of our package after code-only changes (#96).
-  - Real traced run: 45 observations (3 crews, 8 agent tasks, 18 LLM calls, 15 tool spans), tokens identical to ours, cost within 0.5 % (Langfuse knows Groq's cached-token price). API container traces to `langfuse-web:3000`.
+  - Real traced run: 45 observations (3 crews, 8 agent tasks, 18 LLM calls, 15 tool spans), tokens identical to ours, cost within 0.5 % (Langfuse knows Groq's cached-token price). The API container's spans reach Langfuse at `langfuse-web:3000` and are stored (re-checked after freeing disk space; the first API-run trace was lost to the full disk).
 - 2026-11-16: Phase 4 done (DECISIONS #85–89).
   - `app/api/jobs.py`: SQLite job + event store (WAL, conditional status updates, final event saved with the result, timeout on read, restart cleanup).
   - `app/api/runner.py`: one job at a time in a worker thread; later jobs `queued`.
@@ -64,11 +64,12 @@
 - 2026-11-16: Phase 3 Arabic exit check (DECISIONS #84): completed on gpt-oss-120b; Arabic RTL report with citations, cross-lingual search into an English PDF, an honest "no evidence" for sq1; 53K tokens, $0.011, 428 s.
 
 ## Next
-- **You:** open Langfuse at http://localhost:3000 (email and password: `LANGFUSE_INIT_USER_EMAIL` / `LANGFUSE_INIT_USER_PASSWORD` in your `.env`), look at the trace, take the README screenshot; then commit Phase 5.
-- Phase 6: detailed plan first (25–30 questions EN/AR as JSONL + Langfuse dataset, citation coverage, LLM-as-judge with a different model, tool-call success, latency, cost; 2 configurations; `make eval` → `evals/results.md`). Needs: more sample PDFs (manual download) and a judge-model key (e.g. Gemini, free tier).
-- Optional, free: test the demo container over the internet with a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
+- **You:** create a Gemini API key (https://aistudio.google.com/apikey) and add `GEMINI_API_KEY` to `.env`; tell me the free-tier limits AI Studio shows for the Flash models.
+- Phase 6 (plan: `docs/phase-6-evals.md`): judge + metrics + resumable runner, a 2-question pilot (sequential vs hierarchical), the 25-question dataset, then `make eval` once a day (~13–16 days).
+- Optional: take the Langfuse trace screenshot for the README (login: `LANGFUSE_INIT_USER_EMAIL` / `LANGFUSE_INIT_USER_PASSWORD` in `.env`); add sample PDFs (`data/SOURCES.md`); test the demo container over a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
 
 ## Known issues / risks
+- Langfuse needs free disk space: when the disk was nearly full (2026-11-18, a container from another project), its MinIO refused writes and an API-run trace was lost (HTTP 500 on span upload). Fixed by freeing space; re-checked from the api container.
 - Langfuse needs ~3–4 GB RAM while running (6 containers); start it only when you want traces (`make langfuse-up`). Without it, runs work the same; with keys set but Langfuse stopped, the API logs a warning and spans are dropped.
 - Our cost numbers ignore Groq's cached-input discount (~0.5 % high); Langfuse shows the exact cost.
 - CrewAI calls `load_dotenv()` when imported (`crewai/llm.py`): python-dotenv searches upward from CrewAI's own folder, so the project `.env` is loaded into the environment even when a command runs from another folder. Harmless (our settings read the same `.env`), but a "missing key" test only works without that file (found in the 2026-11-16 review).
