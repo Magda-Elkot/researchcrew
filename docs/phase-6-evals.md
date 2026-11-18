@@ -1,6 +1,6 @@
 # Phase 6 — Evaluation suite and results
 
-**Status:** detailed plan (2026-11-18), waiting for the Gemini key and free disk space.
+**Status:** built (2026-11-18); pilot done, full eval runs over the coming days (DECISIONS #101–105).
 [Back to master plan](PLAN.md)
 
 ## Goal
@@ -18,7 +18,7 @@ configurations, and publish the numbers (`evals/results.md`, Langfuse scores).
 
 ## Budget (measured, not guessed)
 A quick run is ~45–53K tokens (Phases 3–5: 52.4K, 53.0K, 45.8K, 49.1K, 50.9K). Hierarchical adds
-the manager's calls (measured in the pilot). 25 questions × 2 configs ≈ 2.5–3M tokens against
+the manager's calls (measured in the pilot). 26 questions × 2 configs ≈ 2.5–3M tokens against
 200K tokens/day for gpt-oss-120b ⇒ **~13–16 days** of runs. So the runner is **resumable**:
 each (question, config) result is a file in `evals/runs/`, `make eval` skips finished ones,
 and it stops cleanly (no failed results saved) when Groq's daily limit is reached.
@@ -33,25 +33,26 @@ and it stops cleanly (no failed results saved) when Groq's daily limit is reache
 | Latency p50/p95, cost per report, tokens | `RunResult` | `evals/report.py` |
 
 ## Design
-- **`evals/dataset.jsonl`:** 25 questions (≈13 EN, 12 AR) `{id, question, language, topic,
+- **`evals/dataset.jsonl`:** 26 questions (15 EN, 11 AR) `{id, question, language, topic,
   expected_aspects: [3–5 key points]}`, each answerable from the indexed documents. Uploaded as a
   Langfuse dataset (`researchcrew-eval`).
 - **Raw tool outputs:** `RunResult` gains the run's tool records (tool, ok, output, scope), so the
   judge can check claims against what the tools really returned. The API keeps returning only
   the SPEC fields.
 - **`evals/run.py` (`make eval`):** for each config and question not yet in `evals/runs/`:
-  `run_research` (traced, environment `eval`, tag `config:`) → metrics → judge → save → Langfuse
-  scores on the run's trace + dataset run item. Concurrency 1 by default (one Groq quota);
+  `run_research` (traced, environment `eval`, tag `process:<config>`) → metrics → judge → save →
+  Langfuse scores on the run's trace (no dataset-run linking, #103). Concurrency 1 by default (one Groq quota);
   judge calls retry with backoff on 429.
 - **`evals/report.py`:** `evals/results.md` with one row per config (means, p50/p95, cost, n),
   plus per-question details.
+- **Judge model:** `gemini/gemini-3.5-flash-lite`, pinned (#101); completeness computed from per-aspect verdicts (#102); Langfuse dataset + scores, no run linking (#103); `RecoveringLLM` (#104).
 - **No Tavily cache** (was planned): web search is rarely used and Tavily's free credits cover
   the whole eval; a cache would add code for nothing.
 
 ## Steps
 1. Pilot first (cheap): judge + metrics + runner on 2 questions × 2 configs, to measure the
    hierarchical token cost and check it finishes.
-2. Dataset (25 questions) + Langfuse dataset upload.
+2. Dataset (26 questions) + Langfuse dataset upload.
 3. Full run over the following days (`make eval` once a day), then `evals/results.md`.
 
 ## Tests

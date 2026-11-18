@@ -105,6 +105,17 @@ class Settings(BaseSettings):
     langfuse_ui_url: str = "http://localhost:3000"
     langfuse_tracing_environment: str = "dev"
 
+    # --- Evaluation (Phase 6) ---
+    # The judge: a different provider and model family from the generator (DECISIONS #98, #101).
+    gemini_api_key: SecretStr | None = None
+    judge_model: str = "gemini/gemini-3.5-flash-lite"
+    # Judge calls per minute (stay well inside the free tier; a 429 also backs off).
+    judge_requests_per_minute: int = Field(default=10, ge=1)
+    # Characters of raw tool output shown to the judge around each cited snippet.
+    judge_context_chars: int = Field(default=1500, ge=200)
+    # Where `make eval` keeps the dataset, the per-run results and results.md.
+    eval_dir: str = "evals"
+
     @model_validator(mode="after")
     def _overlap_smaller_than_chunk(self) -> Self:
         if self.chunk_overlap >= self.chunk_tokens:

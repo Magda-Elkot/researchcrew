@@ -32,7 +32,7 @@
 - MCP Inspector: `make inspect` (UI) or `npx -y @modelcontextprotocol/inspector@2.13.0 --cli http://localhost:8001/mcp --transport http --method tools/list`
 - Demo container (Phase 2b): `make demo-prepare`, `make demo-build`, `make demo-run`, then `uv run python deploy/demo/smoke_test.py http://localhost:7860/mcp`; free public test link: `make demo-tunnel` (you run it; see learning/07-free-live-demo-guide.md)
 - Phase 3a MCP spike (needs Qdrant + docs-mcp running): `uv run python scripts/spike_mcp.py bench` (no keys) or `... agent` (needs GROQ_API_KEY + TAVILY_API_KEY)
-- Evals: `make eval` (placeholder until Phase 6)
+- Evals (needs Qdrant + docs-mcp + GROQ/TAVILY/GEMINI keys; Langfuse optional): `make eval` (resumable, run once a day until done; exit code 3 = stopped at Groq's daily limit) → `evals/runs/` + `evals/results.md`; one question/config: `uv run python -m evals.run --config sequential --questions q01`; `make eval-report` rewrites results.md without LLM calls
 (Update this list whenever you add a new command.)
 
 ## Code conventions

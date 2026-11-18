@@ -79,7 +79,7 @@ allowed-confusables = ["ا", "ه"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["app", "mcp_servers", "frontend"]
+files = ["app", "mcp_servers", "frontend", "evals"]
 # PyMuPDF's Document constructor has no type hints; allow calls into it (only that package).
 untyped_calls_exclude = ["pymupdf"]
 

@@ -1,5 +1,5 @@
 # Shortcuts for common tasks. Run `make <target>`.
-.PHONY: install lint format typecheck test check up down ingest docs-mcp api frontend langfuse-env langfuse-up langfuse-down inspect demo-prepare demo-build demo-run demo-tunnel eval
+.PHONY: install lint format typecheck test check up down ingest docs-mcp api frontend langfuse-env langfuse-up langfuse-down inspect demo-prepare demo-build demo-run demo-tunnel eval eval-report
 
 install:  ## Install all dependency groups into .venv
 	uv sync --all-groups
@@ -13,7 +13,7 @@ format:  ## Auto-fix lint issues and format code
 	uv run ruff format .
 
 typecheck:  ## Static type check
-	uv run mypy app mcp_servers frontend
+	uv run mypy app mcp_servers frontend evals
 
 test:  ## Run the test suite (no network, no keys)
 	uv run pytest
@@ -63,6 +63,8 @@ demo-run:  ## Phase 2b: run it like a 2-vCPU host (2 CPUs, 4 GB, uid 1000) on :7
 demo-tunnel:  ## Phase 2b: TEMPORARY free public https link to the demo on :7860 (needs cloudflared; Ctrl+C stops it)
 	cloudflared tunnel --url http://localhost:7860
 
-eval:  ## Placeholder until Phase 6
-	@echo "make eval is available in Phase 6"
-	@exit 1
+eval:  ## Phase 6: run the eval dataset (resumable; stops at Groq's daily limit, run again next day) -> evals/results.md
+	LANGFUSE_TRACING_ENVIRONMENT=eval uv run python -m evals.run
+
+eval-report:  ## Rewrite evals/results.md from the saved runs (no LLM calls)
+	uv run python -m evals.report

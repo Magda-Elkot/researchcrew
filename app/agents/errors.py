@@ -9,6 +9,8 @@ because CrewAI and LiteLLM wrap provider errors in their own types.
 from app.agents.pacing import wait_from_message
 
 MAX_DETAIL_CHARS = 300
+# Part of the daily-limit message; the eval runner looks for it to stop and resume next day.
+DAILY_LIMIT_MARKER = "daily token limit is reached"
 
 
 def _chain_text(exc: BaseException) -> str:
@@ -36,7 +38,7 @@ def readable_error(exc: BaseException) -> str:
     lowered = text.lower()
     if "tokens per day" in lowered or "(tpd)" in lowered:
         return (
-            "The LLM provider's daily token limit is reached (Groq free tier). "
+            f"The LLM provider's {DAILY_LIMIT_MARKER} (Groq free tier). "
             f"{_try_again(text)}, or set LLM_MODEL to a model with its own quota."
         )
     if "ratelimit" in lowered or "rate limit" in lowered:

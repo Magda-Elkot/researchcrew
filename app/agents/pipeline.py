@@ -17,7 +17,7 @@ from contextlib import AbstractContextManager, contextmanager
 from typing import Any, Protocol
 
 from crewai import Process
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from app.agents.agents import build_llm
 from app.agents.crew import CrewSteps, MainOutput
@@ -74,6 +74,15 @@ class Steps(Protocol):
 OpenSteps = Callable[[Settings, RunGuard, DepthLimits, Process], AbstractContextManager[Steps]]
 
 
+class ToolCall(BaseModel):
+    """One executed tool call with its raw output (the evals check claims against it)."""
+
+    tool: str
+    scope: str  # the research task (sub-question id) that called it
+    ok: bool
+    output: str
+
+
 class RunResult(JobResult):
     """Everything about one run: the API's JobResult plus what the evals and the CLI need."""
 
@@ -91,6 +100,8 @@ class RunResult(JobResult):
     tool_calls: int = 0
     # The run's Langfuse trace (None when tracing is off).
     trace_id: str | None = None
+    # Executed tool calls with raw outputs (not returned by the API; used by the evals).
+    tool_log: list[ToolCall] = Field(default_factory=list)
 
 
 @contextmanager
@@ -254,6 +265,9 @@ def _run(
     result.cost_usd = cost_usd(settings.llm_model, usage)
     result.latency_s = round(time.monotonic() - started, 1)
     result.tool_calls = guard.calls
+    result.tool_log = [
+        ToolCall(tool=r.tool, scope=r.scope, ok=r.ok, output=r.output) for r in guard.records
+    ]
     logger.info(
         "run finished",
         extra={

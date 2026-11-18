@@ -141,6 +141,36 @@ def trace_url(settings: Settings, trace_id: str | None) -> str | None:
     return f"{settings.langfuse_ui_url.rstrip('/')}/trace/{trace_id}"
 
 
+def score_trace(trace_id: str | None, name: str, value: float, comment: str = "") -> None:
+    """Attach an evaluation score to a run's trace (Phase 6; no-op when tracing is off)."""
+    client = _state["client"]
+    if client is None or not trace_id:
+        return
+    client.create_score(
+        trace_id=trace_id, name=name, value=value, data_type="NUMERIC", comment=comment or None
+    )
+
+
+def upload_dataset(name: str, description: str, items: list[dict[str, Any]]) -> bool:
+    """Create (or update) a Langfuse dataset; each item needs an `id`. False if tracing is off."""
+    client = _state["client"]
+    if client is None:
+        return False
+    try:
+        client.create_dataset(name=name, description=description)
+    except Exception as exc:  # it may already exist; the items below are upserted by id
+        logger.info("dataset not created", extra={"dataset": name, "error": str(exc)[:200]})
+    for item in items:
+        client.create_dataset_item(
+            dataset_name=name,
+            id=item["id"],
+            input=item["input"],
+            expected_output=item.get("expected_output"),
+            metadata=item.get("metadata"),
+        )
+    return True
+
+
 def flush_tracing() -> None:
     """Send buffered spans now (the CLI calls it before exiting, the API at shutdown)."""
     client = _state["client"]

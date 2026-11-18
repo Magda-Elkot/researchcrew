@@ -55,3 +55,9 @@ def test_known_errors(exc: Exception, expected: str) -> None:
 
 def test_unknown_errors_keep_type_and_a_short_message() -> None:
     assert readable_error(ValueError("x" * 1000)) == "ValueError: " + "x" * 300
+
+
+def test_the_daily_limit_message_carries_the_marker_the_eval_runner_looks_for() -> None:
+    from app.agents.errors import DAILY_LIMIT_MARKER
+
+    assert DAILY_LIMIT_MARKER in readable_error(RateLimitError(TPD))

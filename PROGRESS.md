@@ -1,7 +1,7 @@
 # Progress
 
 ## Current phase
-**5 of 7 phases done (1–5, all committed, CI green). Phase 6 planned (docs/phase-6-evals.md); waiting for a Gemini key.**
+**5 of 7 phases done (1–5, all committed, CI green). Phase 6 in progress: code, dataset and judge done; pilot run; full eval runs over the coming days.**
 
 ## Done
 - 2026-11-13: plan reviewed against SPEC.md. Docs updated: PLAN.md, all phase docs, and the new phase-2b spike. Decisions recorded in DECISIONS.md.
@@ -46,6 +46,12 @@
   - api image: Node 24 + pinned filesystem MCP server (1.61 GB), verified in the container.
   - Real English run: completed, 7 evidence items, all sub-questions answered, 52K tokens, $0.012.
   - 255 tests passing; ruff + mypy strict clean.
+- 2026-11-18: Phase 6 built (DECISIONS #101–105).
+  - `evals/metrics.py` (citation coverage incl. Arabic sentence split, tool stats, percentiles), `evals/judge.py` (Gemini judge via LiteLLM: faithfulness vs raw tool output, completeness from per-aspect verdicts; pacing + backoff), `evals/run.py` (resumable per config/question, stops at Groq's daily limit, scores on Langfuse traces, dataset upload), `evals/report.py` (`evals/results.md`).
+  - `evals/dataset.jsonl`: 26 questions (15 EN, 11 AR) on the 5 indexed PDFs, 3–5 expected aspects each, all checked against the documents.
+  - `RunResult.tool_log` keeps raw tool outputs for the judge; `RecoveringLLM` recovers answers sent as fake tool calls.
+  - `make eval`, `make eval-report`; mypy and CI cover `evals/`. 354 tests passing (also with the network off).
+  - Pilot q01: sequential completed (coverage 100 %, faithfulness 4.64, completeness 1.5); hierarchical failed on the fake-tool quirk, fixed afterwards.
 - 2026-11-18: Phase 5 done (DECISIONS #90–97).
   - Self-hosted Langfuse 4.80.0 in compose profile `observability` (web, worker, Postgres, ClickHouse, Redis, MinIO; pinned; only the UI published on 127.0.0.1:3000); `make langfuse-env` (random secrets + headless-init keys into `.env`), `make langfuse-up` / `langfuse-down`.
   - `app/observability.py`: tracing on only with Langfuse keys; CrewAI + LiteLLM instrumented; one root span per run with tags depth/model/process/version and the job id; `trace_id` on `RunResult`, in `GET /research/{id}` (+ `trace_url`) and on every log line inside a run.
@@ -64,11 +70,15 @@
 - 2026-11-16: Phase 3 Arabic exit check (DECISIONS #84): completed on gpt-oss-120b; Arabic RTL report with citations, cross-lingual search into an English PDF, an honest "no evidence" for sq1; 53K tokens, $0.011, 428 s.
 
 ## Next
-- **You:** create a Gemini API key (https://aistudio.google.com/apikey) and add `GEMINI_API_KEY` to `.env`; tell me the free-tier limits AI Studio shows for the Flash models.
-- Phase 6 (plan: `docs/phase-6-evals.md`): judge + metrics + resumable runner, a 2-question pilot (sequential vs hierarchical), the 25-question dataset, then `make eval` once a day (~13–16 days).
-- Optional: take the Langfuse trace screenshot for the README (login: `LANGFUSE_INIT_USER_EMAIL` / `LANGFUSE_INIT_USER_PASSWORD` in `.env`); add sample PDFs (`data/SOURCES.md`); test the demo container over a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
+- Re-run the hierarchical pilot with the fix (next Groq day): `uv run python -m evals.run --questions q01 --config hierarchical --retry-failed`.
+- Then `make eval` once a day (~2 runs per 100K tokens; 52 runs ≈ 2–3 weeks). Exit code 3 = stopped at Groq's daily limit, finished runs are kept. Keep Qdrant, docs-mcp and (for scores in Langfuse) Langfuse running.
+- When done: review `evals/results.md`, then Phase 7 (README with results table, Langfuse screenshot, demo GIF, static demo page).
+- Optional: take the Langfuse trace screenshot (login in `.env`); add sample PDFs (`data/SOURCES.md`) and questions for them before most runs are done.
 
 ## Known issues / risks
+- Faithfulness can't catch chart misreadings: PDF text puts chart labels and numbers side by side, so a wrong pairing still "appears in the source" (eval pilot q01, DECISIONS #105). Completeness against hand-written aspects catches them.
+- The judge (Gemini 3.5 Flash-Lite) rejects `temperature`, so its scores can vary slightly between identical runs.
+- The full eval takes 2–3 weeks on Groq's free tier (both configs share one 200K/day quota).
 - Langfuse needs free disk space: when the disk was nearly full (2026-11-18, a container from another project), its MinIO refused writes and an API-run trace was lost (HTTP 500 on span upload). Fixed by freeing space; re-checked from the api container.
 - Langfuse needs ~3–4 GB RAM while running (6 containers); start it only when you want traces (`make langfuse-up`). Without it, runs work the same; with keys set but Langfuse stopped, the API logs a warning and spans are dropped.
 - Our cost numbers ignore Groq's cached-input discount (~0.5 % high); Langfuse shows the exact cost.

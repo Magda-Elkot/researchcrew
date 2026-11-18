@@ -35,3 +35,6 @@ outputs/
 
 # SQLite job store of the API (Phase 4)
 var/
+
+# Eval run files (raw tool outputs incl. web text); only evals/results.md is published
+evals/runs/
