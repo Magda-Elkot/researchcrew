@@ -51,7 +51,7 @@
   - `evals/dataset.jsonl`: 26 questions (15 EN, 11 AR) on the 5 indexed PDFs, 3–5 expected aspects each, all checked against the documents.
   - `RunResult.tool_log` keeps raw tool outputs for the judge; `RecoveringLLM` recovers answers sent as fake tool calls.
   - `make eval`, `make eval-report`; mypy and CI cover `evals/`. 354 tests passing (also with the network off).
-  - Pilot q01: sequential completed (coverage 100 %, faithfulness 4.64, completeness 1.5); hierarchical failed on the fake-tool quirk, fixed afterwards.
+  - Pilot q01: sequential completed (coverage 100 %, faithfulness 4.64, completeness 1.5); hierarchical failed on the fake-tool quirk, fixed afterwards (#104); a real re-run recovered a fake call and reached the Writer before Groq's daily limit stopped it cleanly (#108). Pacing now counts tool definitions and real usage (#106); one eval at a time (#107).
 - 2026-11-18: Phase 5 done (DECISIONS #90–97).
   - Self-hosted Langfuse 4.80.0 in compose profile `observability` (web, worker, Postgres, ClickHouse, Redis, MinIO; pinned; only the UI published on 127.0.0.1:3000); `make langfuse-env` (random secrets + headless-init keys into `.env`), `make langfuse-up` / `langfuse-down`.
   - `app/observability.py`: tracing on only with Langfuse keys; CrewAI + LiteLLM instrumented; one root span per run with tags depth/model/process/version and the job id; `trace_id` on `RunResult`, in `GET /research/{id}` (+ `trace_url`) and on every log line inside a run.
@@ -70,7 +70,7 @@
 - 2026-11-16: Phase 3 Arabic exit check (DECISIONS #84): completed on gpt-oss-120b; Arabic RTL report with citations, cross-lingual search into an English PDF, an honest "no evidence" for sq1; 53K tokens, $0.011, 428 s.
 
 ## Next
-- Re-run the hierarchical pilot with the fix (next Groq day): `uv run python -m evals.run --questions q01 --config hierarchical --retry-failed`.
+- Re-run the hierarchical pilot (next Groq day, nothing else running): `uv run python -m evals.run --questions q01 --config hierarchical --retry-failed`. Run only one eval at a time (a second one now exits with code 4).
 - Then `make eval` once a day (~2 runs per 100K tokens; 52 runs ≈ 2–3 weeks). Exit code 3 = stopped at Groq's daily limit, finished runs are kept. Keep Qdrant, docs-mcp and (for scores in Langfuse) Langfuse running.
 - When done: review `evals/results.md`, then Phase 7 (README with results table, Langfuse screenshot, demo GIF, static demo page).
 - Optional: take the Langfuse trace screenshot (login in `.env`); add sample PDFs (`data/SOURCES.md`) and questions for them before most runs are done.

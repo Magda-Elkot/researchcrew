@@ -15,7 +15,9 @@ Run: `uv run python -m evals.run [--config sequential] [--questions q01,q02] [--
 """
 
 import argparse
-from collections.abc import Callable
+import fcntl
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -90,6 +92,24 @@ class BudgetExhausted(RuntimeError):
 
 
 RunFn = Callable[..., RunResult]
+EXIT_BUSY = 4  # another eval is already running
+
+
+@contextmanager
+def single_run(runs_dir: Path) -> Iterator[bool]:
+    """True if no other eval holds the lock (two evals at once share one tokens-per-minute
+    quota and fail each other, DECISIONS #107). The OS releases the lock if the process dies."""
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    with (runs_dir / ".lock").open("w") as lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
 def load_dataset(path: Path) -> list[EvalQuestion]:
@@ -244,8 +264,6 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from evals.report import write_results
-
     args = parse_args(argv)
     try:
         require("GROQ_API_KEY", "TAVILY_API_KEY", "GEMINI_API_KEY")
@@ -254,6 +272,17 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     settings = get_settings()
     eval_dir = Path(settings.eval_dir)
+    # The lock comes first: a second eval must not touch Langfuse or Groq at all.
+    with single_run(eval_dir / "runs") as alone:
+        if not alone:
+            logger.error("another eval is already running; wait for it to finish")
+            return EXIT_BUSY
+        return _eval(args, settings, eval_dir)
+
+
+def _eval(args: argparse.Namespace, settings: Settings, eval_dir: Path) -> int:
+    from evals.report import write_results
+
     questions = load_dataset(eval_dir / "dataset.jsonl")
     if args.questions:
         wanted = set(args.questions.split(","))
@@ -275,18 +304,7 @@ def main(argv: list[str] | None = None) -> int:
         ],
     )
     started = datetime.now()
-    try:
-        done, stopped = run_eval(
-            questions,
-            configs,
-            eval_dir / "runs",
-            settings,
-            litellm_complete(settings),
-            retry_failed=args.retry_failed,
-            limit=args.limit,
-        )
-    finally:
-        flush_tracing()
+    done, stopped = _run_and_flush(questions, configs, eval_dir, settings, args)
     results = write_results(eval_dir)
     logger.info(
         "eval finished",
@@ -298,6 +316,27 @@ def main(argv: list[str] | None = None) -> int:
         },
     )
     return EXIT_BUDGET if stopped else 0
+
+
+def _run_and_flush(
+    questions: list[EvalQuestion],
+    configs: list[str],
+    eval_dir: Path,
+    settings: Settings,
+    args: argparse.Namespace,
+) -> tuple[int, bool]:
+    try:
+        return run_eval(
+            questions,
+            configs,
+            eval_dir / "runs",
+            settings,
+            litellm_complete(settings),
+            retry_failed=args.retry_failed,
+            limit=args.limit,
+        )
+    finally:
+        flush_tracing()
 
 
 if __name__ == "__main__":

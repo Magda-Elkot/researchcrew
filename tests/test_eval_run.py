@@ -215,3 +215,32 @@ def test_the_real_dataset_is_valid() -> None:
     assert 25 <= len(questions) <= 30  # SPEC
     assert {q.language for q in questions} == {"en", "ar"}
     assert all(detect_language(q.question) == q.language for q in questions)
+
+
+def test_only_one_eval_can_run_at_a_time(tmp_path: Path) -> None:
+    from evals.run import single_run
+
+    with single_run(tmp_path) as first:
+        assert first is True
+        with single_run(tmp_path) as second:
+            assert second is False  # a second eval would share the per-minute quota
+    with single_run(tmp_path) as again:
+        assert again is True  # released when the first one ended
+
+
+def test_a_second_eval_exits_before_touching_langfuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from evals.run import EXIT_BUSY, main, single_run
+
+    for key in ("GROQ_API_KEY", "TAVILY_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.setenv(key, "test-key")
+    monkeypatch.setenv("EVAL_DIR", str(tmp_path))
+
+    def must_not_run(*args: object) -> None:
+        raise AssertionError("the second eval touched Langfuse")
+
+    monkeypatch.setattr(eval_run, "setup_tracing", must_not_run)
+    monkeypatch.setattr(eval_run, "upload_dataset", must_not_run)
+    with single_run(tmp_path / "runs"):
+        assert main([]) == EXIT_BUSY

@@ -1,6 +1,6 @@
 # Evaluation results
 
-Status: **in progress: 2 of 52** runs · updated 2026-11-18 21:15 UTC · generator: Groq gpt-oss-120b, quick depth · judge: `gemini/gemini-3.5-flash-lite`
+Status: **in progress: 2 of 52** runs · updated 2026-11-18 22:30 UTC · generator: Groq gpt-oss-120b, quick depth · judge: `gemini/gemini-3.5-flash-lite`
 
 Metrics (DECISIONS #98-103): citation coverage = share of report claims whose [n] markers all resolve to grounded evidence; faithfulness = judge's 1-5 per cited claim against the raw tool output, averaged; completeness = 1-5 computed from the judge's yes/partly/no per expected aspect; tool success = executed tool calls without error.
 

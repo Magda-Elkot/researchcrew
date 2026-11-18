@@ -6,14 +6,19 @@ through `TokenPacer.before_call` (registered with CrewAI's official before-LLM-c
 estimates the request's size, and if it would not fit in the last 60 seconds' budget it waits
 until enough earlier calls have left the window. CrewAI's retries stay as a backup.
 
-The estimate (~4 characters per token, plus a reserve for the tool schemas and the answer) was
-calibrated on a real run, and the budget leaves a margin below the provider's limit.
+The estimate counts the messages *and* the schemas of the tools offered with the call (~4
+characters per token, plus a reserve for formatting and the answer). After each call,
+`after_call` replaces the estimate in the window with the real token count from the LLM's usage
+counter, so one wrong guess can't push the next minute over the limit (DECISIONS #106: in the
+hierarchical pilot a request estimated at 3.2K tokens was 5.2K, because the manager's tools
+weren't counted). The budget leaves a margin below the provider's limit.
 
 `capped_retry_waits` makes CrewAI's rate-limit retries wait as long as the provider asks (read
 from Groq's message when there is no header), capped: on Groq's *daily* limit CrewAI once slept
 654 s per attempt and the run looked frozen (DECISIONS #81, #83).
 """
 
+import json
 import re
 import threading
 import time
@@ -24,7 +29,9 @@ from typing import Any
 
 import crewai.llms.retry as crewai_retry
 from crewai.hooks.llm_hooks import (
+    register_after_llm_call_hook,
     register_before_llm_call_hook,
+    unregister_after_llm_call_hook,
     unregister_before_llm_call_hook,
 )
 
@@ -36,18 +43,48 @@ WINDOW_S = 60.0
 # Calibrated on a real quick run (34 calls, ~1,540 tokens each; the first guess of ~3 chars per
 # token + 1,200 reserve overestimated ~2.8x and spent 694 of 731 s waiting, DECISIONS #79).
 CHARS_PER_TOKEN = 4.0
-OVERHEAD_TOKENS = 300  # tool schemas and formatting not visible in the messages
+OVERHEAD_TOKENS = 300  # formatting not visible in the messages
 ANSWER_RESERVE_TOKENS = 300
 BUDGET_SHARE = 0.9  # stay below the provider's limit; our count is an estimate
 
 
-def estimate_tokens(messages: list[Any]) -> int:
-    """A cautious size estimate for one request."""
+def _tool_chars(tools: list[Any]) -> int:
+    """Characters of the tool definitions sent with a call (name, description, argument schema)."""
     chars = 0
+    for tool in tools:
+        schema = getattr(tool, "args_schema", None)
+        try:
+            schema_text = json.dumps(schema.model_json_schema()) if schema is not None else ""
+        except Exception:  # an unusual schema: count what we can
+            schema_text = ""
+        chars += len(str(getattr(tool, "name", ""))) + len(str(getattr(tool, "description", "")))
+        chars += len(schema_text)
+    return chars
+
+
+def estimate_tokens(messages: list[Any], tools: list[Any] | None = None) -> int:
+    """A cautious size estimate for one request: messages + tool definitions + reserves."""
+    chars = _tool_chars(tools or [])
     for message in messages:
         content = message.get("content") if isinstance(message, dict) else message
         chars += len(str(content or ""))
     return int(chars / CHARS_PER_TOKEN) + OVERHEAD_TOKENS + ANSWER_RESERVE_TOKENS
+
+
+def _offered_tools(context: Any) -> list[Any]:
+    """The tools CrewAI sends with this call (the executor's, else the agent's)."""
+    tools = getattr(getattr(context, "executor", None), "original_tools", None)
+    if not tools:
+        tools = getattr(getattr(context, "agent", None), "tools", None)
+    return list(tools or [])
+
+
+def _total_tokens(llm: Any) -> int | None:
+    """The LLM's cumulative token count, or None if it doesn't keep one."""
+    try:
+        return int(llm.get_token_usage_summary().total_tokens)
+    except Exception:
+        return None
 
 
 class TokenPacer:
@@ -65,6 +102,7 @@ class TokenPacer:
         self.window: deque[tuple[float, int]] = deque()
         self.waited_s = 0.0
         self._lock = threading.Lock()
+        self._tokens_before: int | None = None  # the LLM's usage counter before the last call
 
     def _drop_old(self, now: float) -> None:
         while self.window and now - self.window[0][0] >= WINDOW_S:
@@ -95,7 +133,25 @@ class TokenPacer:
 
     def before_call(self, context: Any) -> None:
         """CrewAI before-LLM-call hook: never blocks the call, only delays it."""
-        self.wait_for(estimate_tokens(list(getattr(context, "messages", []) or [])))
+        messages = list(getattr(context, "messages", []) or [])
+        self.wait_for(estimate_tokens(messages, _offered_tools(context)))
+        self._tokens_before = _total_tokens(getattr(context, "llm", None))
+
+    def after_call(self, context: Any) -> None:
+        """CrewAI after-LLM-call hook: put the call's real token count in the window."""
+        before, self._tokens_before = self._tokens_before, None
+        after = _total_tokens(getattr(context, "llm", None))
+        if before is None or after is None or after <= before:
+            return  # no usage reported (e.g. a failed call): keep the estimate
+        with self._lock:
+            if self.window:
+                started, estimate = self.window[-1]
+                self.window[-1] = (started, after - before)
+                if after - before > estimate * 1.5:
+                    logger.info(
+                        "llm call larger than estimated",
+                        extra={"estimate": estimate, "actual": after - before},
+                    )
 
 
 @contextmanager
@@ -106,10 +162,12 @@ def paced_llm_calls(tokens_per_minute: int) -> Iterator[TokenPacer | None]:
         return
     pacer = TokenPacer(tokens_per_minute)
     register_before_llm_call_hook(pacer.before_call)
+    register_after_llm_call_hook(pacer.after_call)
     try:
         yield pacer
     finally:
         unregister_before_llm_call_hook(pacer.before_call)
+        unregister_after_llm_call_hook(pacer.after_call)
         logger.info("llm pacing summary", extra={"waited_s": round(pacer.waited_s, 1)})
 
 

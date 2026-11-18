@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import crewai.llms.retry as crewai_retry
 import pytest
-from crewai.hooks.llm_hooks import get_before_llm_call_hooks
+from crewai.hooks.llm_hooks import get_after_llm_call_hooks, get_before_llm_call_hooks
+from pydantic import BaseModel
 
 from app.agents.pacing import (
     ANSWER_RESERVE_TOKENS,
@@ -85,12 +86,67 @@ def test_hook_reads_the_messages_from_the_context() -> None:
     assert p.used() == 10 + OVERHEAD_TOKENS + ANSWER_RESERVE_TOKENS
 
 
-def test_context_manager_registers_and_removes_the_hook() -> None:
-    before = len(get_before_llm_call_hooks())
+def test_context_manager_registers_and_removes_both_hooks() -> None:
+    before, after = len(get_before_llm_call_hooks()), len(get_after_llm_call_hooks())
     with paced_llm_calls(8000) as p:
         assert p is not None
         assert len(get_before_llm_call_hooks()) == before + 1
+        assert len(get_after_llm_call_hooks()) == after + 1
     assert len(get_before_llm_call_hooks()) == before
+    assert len(get_after_llm_call_hooks()) == after
+
+
+class SearchArgs(BaseModel):
+    query: str
+
+
+def tool(name: str, description: str) -> SimpleNamespace:
+    return SimpleNamespace(name=name, description=description, args_schema=SearchArgs)
+
+
+def test_the_offered_tool_definitions_are_counted() -> None:
+    messages = [{"role": "user", "content": "x" * 400}]
+    tools = [tool("Delegate work to coworker", "d" * 2000)]
+    assert estimate_tokens(messages, tools) > estimate_tokens(messages) + 500
+    # the executor's tools win over the agent's (the manager gets delegation tools at run time)
+    p, _ = pacer()
+    context = SimpleNamespace(
+        messages=messages,
+        executor=SimpleNamespace(original_tools=tools),
+        agent=SimpleNamespace(tools=[]),
+        llm=None,
+    )
+    p.before_call(context)
+    assert p.used() == estimate_tokens(messages, tools)
+
+
+class FakeLLM:
+    def __init__(self) -> None:
+        self.total = 1000
+
+    def get_token_usage_summary(self) -> SimpleNamespace:
+        return SimpleNamespace(total_tokens=self.total)
+
+
+def test_after_a_call_the_window_holds_the_real_token_count() -> None:
+    p, _ = pacer()
+    llm = FakeLLM()
+    context = SimpleNamespace(messages=[{"role": "user", "content": "y" * 40}], llm=llm)
+    p.before_call(context)
+    llm.total += 5171  # what Groq really counted
+    p.after_call(context)
+    assert p.used() == 5171
+
+
+def test_a_call_without_reported_usage_keeps_its_estimate() -> None:
+    p, _ = pacer()
+    llm = FakeLLM()
+    context = SimpleNamespace(messages=[{"role": "user", "content": "y" * 40}], llm=llm)
+    p.before_call(context)
+    estimate = p.used()
+    p.after_call(context)  # e.g. a failed call: the counter didn't move
+    assert p.used() == estimate
+    p.after_call(SimpleNamespace(llm=object()))  # an LLM without a counter: no error
 
 
 def test_zero_turns_pacing_off() -> None:
