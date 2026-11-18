@@ -1,7 +1,7 @@
 # Progress
 
 ## Current phase
-**4 of 7 phases done (1, 2, 3, 4; plus the 2b and 3a spikes), waiting for your review: one manual check left, a question asked in the browser (live progress + report). Next: Phase 5 (Langfuse tracing).**
+**5 of 7 phases done (1–5; plus the 2b and 3a spikes), waiting for your review (Phase 5 not committed yet). Next: Phase 6 (evaluation suite).**
 
 ## Done
 - 2026-11-13: plan reviewed against SPEC.md. Docs updated: PLAN.md, all phase docs, and the new phase-2b spike. Decisions recorded in DECISIONS.md.
@@ -46,6 +46,11 @@
   - api image: Node 24 + pinned filesystem MCP server (1.61 GB), verified in the container.
   - Real English run: completed, 7 evidence items, all sub-questions answered, 52K tokens, $0.012.
   - 255 tests passing; ruff + mypy strict clean.
+- 2026-11-18: Phase 5 done (DECISIONS #90–97).
+  - Self-hosted Langfuse 4.80.0 in compose profile `observability` (web, worker, Postgres, ClickHouse, Redis, MinIO; pinned; only the UI published on 127.0.0.1:3000); `make langfuse-env` (random secrets + headless-init keys into `.env`), `make langfuse-up` / `langfuse-down`.
+  - `app/observability.py`: tracing on only with Langfuse keys; CrewAI + LiteLLM instrumented; one root span per run with tags depth/model/process/version and the job id; `trace_id` on `RunResult`, in `GET /research/{id}` (+ `trace_url`) and on every log line inside a run.
+  - uvicorn logs as JSON. Bug fixed: Docker images installed a stale build of our package after code-only changes (#96).
+  - Real traced run: 45 observations (3 crews, 8 agent tasks, 18 LLM calls, 15 tool spans), tokens identical to ours, cost within 0.5 % (Langfuse knows Groq's cached-token price). API container traces to `langfuse-web:3000`.
 - 2026-11-16: Phase 4 done (DECISIONS #85–89).
   - `app/api/jobs.py`: SQLite job + event store (WAL, conditional status updates, final event saved with the result, timeout on read, restart cleanup).
   - `app/api/runner.py`: one job at a time in a worker thread; later jobs `queued`.
@@ -59,13 +64,13 @@
 - 2026-11-16: Phase 3 Arabic exit check (DECISIONS #84): completed on gpt-oss-120b; Arabic RTL report with citations, cross-lingual search into an English PDF, an honest "no evidence" for sq1; 53K tokens, $0.011, 428 s.
 
 ## Next
-- **You:** ask one question in the browser (http://127.0.0.1:8501 with `make api` + `make frontend`, or `make up`), then review and commit Phase 4.
-- Phase 5: detailed plan first (self-hosted Langfuse in the `observability` profile; one trace per run, spans per agent/tool/LLM call, tokens and cost, tags).
+- **You:** open Langfuse at http://localhost:3000 (email and password: `LANGFUSE_INIT_USER_EMAIL` / `LANGFUSE_INIT_USER_PASSWORD` in your `.env`), look at the trace, take the README screenshot; then commit Phase 5.
+- Phase 6: detailed plan first (25–30 questions EN/AR as JSONL + Langfuse dataset, citation coverage, LLM-as-judge with a different model, tool-call success, latency, cost; 2 configurations; `make eval` → `evals/results.md`). Needs: more sample PDFs (manual download) and a judge-model key (e.g. Gemini, free tier).
 - Optional, free: test the demo container over the internet with a Cloudflare quick tunnel (learning/07-free-live-demo-guide.md).
-- Optional data top-up (manual browser download, see `data/SOURCES.md`): the UNESCO Recommendation full text (EN + AR) and an Arabic renewable-energy report. Then `make ingest`.
-- Parallel track (needs your approval): 25 eval questions with `expected_aspects`, covering the indexed topics.
 
 ## Known issues / risks
+- Langfuse needs ~3–4 GB RAM while running (6 containers); start it only when you want traces (`make langfuse-up`). Without it, runs work the same; with keys set but Langfuse stopped, the API logs a warning and spans are dropped.
+- Our cost numbers ignore Groq's cached-input discount (~0.5 % high); Langfuse shows the exact cost.
 - CrewAI calls `load_dotenv()` when imported (`crewai/llm.py`): python-dotenv searches upward from CrewAI's own folder, so the project `.env` is loaded into the environment even when a command runs from another folder. Harmless (our settings read the same `.env`), but a "missing key" test only works without that file (found in the 2026-11-16 review).
 - When the filesystem MCP server can't start (e.g. no `data/notes` in the working folder), it is skipped correctly, but only after the full `MCP_CONNECT_TIMEOUT` (30 s).
 - gpt-oss on Groq sometimes answers a structured step (Writer `Report`) by calling a non-existent tool (`report`), like the `json` case (#75); CrewAI recovered in the run, but it costs one extra call.
@@ -90,7 +95,6 @@
 - This machine's `docker build` is the legacy builder (no buildx plugin), so no BuildKit cache mounts outside compose.
 - mcp is pinned below 2 because of crewai; revisit when crewai supports mcp 2.x.
 - Starlette warns that `TestClient` with `httpx` is deprecated in favour of `httpx2`. Harmless for now; switching would add a library, so it needs approval.
-- uvicorn's own access logs are not JSON yet (moved to Phase 5 with the tracing work).
 - On this machine port 6333 is used by another Qdrant (`de-rs`), so the local `.env` sets `QDRANT_HOST_PORT=6335` and `QDRANT_URL=http://localhost:6335`.
 - Sample data is thinner than planned (5 PDFs, not 10–15; AI ethics only a 2-page flyer; no Arabic energy document), because several publishers block scripted downloads.
 - The UNESCO flyer has no licence statement, so it's git-ignored until confirmed.

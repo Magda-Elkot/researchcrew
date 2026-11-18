@@ -98,3 +98,18 @@ def test_chatty_libraries_only_log_warnings() -> None:
     get_logger("x")
     for name in ("LiteLLM", "mcp.client.streamable_http", "httpx"):
         assert logging.getLogger(name).level == logging.WARNING
+
+
+def test_uvicorn_log_config_writes_json(capsys: pytest.CaptureFixture[str]) -> None:
+    import logging.config
+    from pathlib import Path
+
+    path = Path(__file__).parents[1] / "app" / "api" / "uvicorn_log.json"
+    logging.config.dictConfig(json.loads(path.read_text(encoding="utf-8")))
+    access = logging.getLogger("uvicorn.access")
+    access.info('%s - "%s %s HTTP/%s" %d', "127.0.0.1:1", "GET", "/health", "1.1", 200)
+    logging.getLogger("uvicorn.error").info("Started", extra={"color_message": "\x1b[1mStarted"})
+    lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert lines[0]["message"] == '127.0.0.1:1 - "GET /health HTTP/1.1" 200'
+    assert lines[0]["logger"] == "uvicorn.access"
+    assert "color_message" not in lines[1]

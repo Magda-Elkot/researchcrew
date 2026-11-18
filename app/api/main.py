@@ -19,6 +19,7 @@ from app.api.routes import router
 from app.api.runner import JobRunner, RunFn
 from app.config import get_settings, require
 from app.log import get_logger
+from app.observability import flush_tracing, setup_tracing
 
 logger = get_logger(__name__)
 
@@ -68,6 +69,7 @@ def create_app(run_fn: RunFn = run_research) -> FastAPI:
         """Fail fast on missing configuration before serving any request."""
         require(*REQUIRED_KEYS)
         settings = get_settings()
+        setup_tracing(settings)
         store = JobStore(settings.jobs_db_path)
         abandoned = store.fail_unfinished(RESTART_MESSAGE)
         runner = JobRunner(store, settings, run_fn)
@@ -78,6 +80,7 @@ def create_app(run_fn: RunFn = run_research) -> FastAPI:
         )
         yield
         runner.shutdown()
+        flush_tracing()
         logger.info("api stopping")
 
     app = FastAPI(title="ResearchCrew", version=get_settings().app_version, lifespan=lifespan)

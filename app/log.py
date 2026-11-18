@@ -39,6 +39,8 @@ _STANDARD_ATTRS = set(vars(logging.LogRecord("", 0, "", 0, "", None, None))) | {
     "message",
     "asctime",
     "taskName",
+    "color_message",  # uvicorn: the message again, with terminal colour codes
+    "litellm_redacted",  # LiteLLM's "already scrubbed" marker on records its filter saw
 }
 
 _configured = False

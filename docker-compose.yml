@@ -1,5 +1,49 @@
 # Host ports are published on 127.0.0.1 only: Qdrant has no auth, so it must not be
 # reachable from the local network.
+
+# Settings shared by langfuse-web and langfuse-worker, adapted from Langfuse's official
+# docker-compose.yml (checked 2026-11-18; DECISIONS #90). Secrets come from .env: run
+# `make langfuse-env` once. Only the web UI is published, on 127.0.0.1.
+x-langfuse-env: &langfuse-env
+  NEXTAUTH_URL: http://localhost:${LANGFUSE_HOST_PORT:-3000}
+  DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:-}@langfuse-postgres:5432/postgres
+  SALT: ${LANGFUSE_SALT:-}
+  ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+  TELEMETRY_ENABLED: "false"
+  LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+  CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+  CLICKHOUSE_USER: clickhouse
+  CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  REDIS_HOST: langfuse-redis
+  REDIS_PORT: "6379"
+  REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-}
+
+x-langfuse-depends: &langfuse-depends
+  langfuse-postgres:
+    condition: service_healthy
+  langfuse-clickhouse:
+    condition: service_healthy
+  langfuse-redis:
+    condition: service_healthy
+  langfuse-minio:
+    condition: service_healthy
+
 services:
   api:
     build:
@@ -11,6 +55,8 @@ services:
       # Inside the compose network services are reachable by name, not localhost.
       QDRANT_URL: http://qdrant:6333
       DOCS_MCP_URL: http://docs-mcp:8001/mcp
+      # Traces go to the self-hosted Langfuse when it runs (profile "observability").
+      LANGFUSE_BASE_URL: http://langfuse-web:3000
     ports:
       - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     volumes:
@@ -84,7 +130,120 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # --- Self-hosted Langfuse: `make langfuse-up` (profile "observability", DECISIONS #90) ----
+  langfuse-web:
+    image: langfuse/langfuse:4.80.0
+    profiles: [observability]
+    depends_on: *langfuse-depends
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      # Headless init: org, project, API keys and first user are created at the first start.
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-}
+      LANGFUSE_INIT_ORG_NAME: ResearchCrew
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-}
+      LANGFUSE_INIT_PROJECT_NAME: ResearchCrew
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: Admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${LANGFUSE_HOST_PORT:-3000}:3000"
+    healthcheck:
+      # The server listens on $HOSTNAME (the container id), not 127.0.0.1; no `hostname` binary.
+      test: ["CMD-SHELL", "wget -qO- http://$$HOSTNAME:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:4.80.0
+    profiles: [observability]
+    depends_on: *langfuse-depends
+    environment: *langfuse-env
+    restart: unless-stopped
+
+  langfuse-postgres:
+    image: postgres:17.12
+    profiles: [observability]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-}
+      POSTGRES_DB: postgres
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:26.3.62.3
+    profiles: [observability]
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+    restart: unless-stopped
+
+  langfuse-minio:
+    # Chainguard's free image only has a "latest" tag: pinned by digest (pulled 2026-11-18).
+    image: cgr.dev/chainguard/minio@sha256:7618b82bba99aadd77fcf59eb6cfd89b4b8b8e01ac796c474d57a1c1abf17e79
+    profiles: [observability]
+    entrypoint: sh
+    # Creates the 'langfuse' bucket folder, then starts the server.
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-}
+    volumes:
+      - langfuse_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    restart: unless-stopped
+
+  langfuse-redis:
+    image: redis:7.4.12
+    profiles: [observability]
+    command: --requirepass ${LANGFUSE_REDIS_AUTH:-} --maxmemory-policy noeviction
+    environment:
+      REDISCLI_AUTH: ${LANGFUSE_REDIS_AUTH:-}  # lets the healthcheck's redis-cli log in
+    volumes:
+      - langfuse_redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   qdrant_storage:
   model_cache:
   jobs_db:
+  langfuse_postgres:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio:
+  langfuse_redis:

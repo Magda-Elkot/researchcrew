@@ -27,10 +27,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --group api --no-install-project
 
 # 2) The project itself (installed as a normal, non-editable package).
+# --reinstall-package: uv decides whether to rebuild our package from pyproject.toml only, so
+# with the cache mount a code-only change would install the previous build (DECISIONS #96).
 COPY app ./app
 COPY mcp_servers ./mcp_servers
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --group api --no-editable
+    uv sync --frozen --no-dev --group api --no-editable --reinstall-package researchcrew
 
 # ---- runtime -------------------------------------------------------------------
 FROM python:3.12-slim AS runtime
@@ -40,6 +42,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=mcp-fs /usr/local/bin/node /usr/local/bin/node
 COPY --from=mcp-fs /opt/mcp-fs /opt/mcp-fs
+# uvicorn's own logs (startup, access) as JSON, like the app's (Phase 5).
+COPY app/api/uvicorn_log.json /app/uvicorn_log.json
 # The CLI writes reports to outputs/; the API keeps its SQLite job store in var/ (a volume).
 RUN mkdir -p /app/outputs /app/var && chown app:app /app/outputs /app/var
 
@@ -55,4 +59,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
 
-CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", \
+     "--log-config", "/app/uvicorn_log.json"]

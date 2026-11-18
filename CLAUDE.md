@@ -26,6 +26,7 @@
 - API locally (needs docs-mcp + Qdrant + keys): `make api` (one worker); then `curl -X POST localhost:8000/research -H 'content-type: application/json' -d '{"question":"...","depth":"quick"}'`, `curl localhost:8000/research/<id>`, live progress `curl -N localhost:8000/research/<id>/events`
 - Frontend locally (needs the API): `make frontend` → http://localhost:8501
 - Research CLI (needs Qdrant + docs-mcp + GROQ_API_KEY + TAVILY_API_KEY): `uv run researchcrew "question" [--depth quick|deep] [--process sequential|hierarchical]` → `outputs/<id>.json` + `.md`
+- Self-hosted Langfuse (Phase 5): `make langfuse-env` once (adds secrets to .env), `make langfuse-up` → http://localhost:3000 (login in .env: LANGFUSE_INIT_USER_EMAIL / _PASSWORD), `make langfuse-down`. Runs are traced when LANGFUSE_PUBLIC_KEY/SECRET_KEY are set; the CLI logs `trace_url`, `GET /research/<id>` returns it
 - Index PDFs: `uv run ingest data/pdfs` (or `make ingest`; `--force` re-embeds unchanged files)
 - docs-mcp server: `uv run docs-mcp` (or `make docs-mcp`; MCP at http://127.0.0.1:8001/mcp)
 - MCP Inspector: `make inspect` (UI) or `npx -y @modelcontextprotocol/inspector@2.13.0 --cli http://localhost:8001/mcp --transport http --method tools/list`

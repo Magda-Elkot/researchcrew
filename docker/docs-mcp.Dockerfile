@@ -19,7 +19,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY app ./app
 COPY mcp_servers ./mcp_servers
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --group docs --no-editable
+    uv sync --frozen --no-dev --group docs --no-editable --reinstall-package researchcrew
+# --reinstall-package: uv decides whether to rebuild our package from pyproject.toml only, so
+# with the cache mount a code-only change would install the previous build (DECISIONS #96).
 
 # ---- runtime -------------------------------------------------------------------
 FROM python:3.12-slim AS runtime

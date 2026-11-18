@@ -63,6 +63,7 @@ class FakeCrew:
             citations=report.citations,
             cost_usd=0.01,
             latency_s=12.5,
+            trace_id="b" * 32,
         )
 
 
@@ -127,6 +128,8 @@ def test_post_returns_202_and_the_job_completes(client: TestClient, crew: FakeCr
     assert (job["cost_usd"], job["latency_s"]) == (0.01, 12.5)
     assert job["report_markdown"].startswith("# الطاقة الشمسية")
     assert "<div" not in job["report_markdown"]  # the frontend sets the direction itself
+    assert job["trace_id"] == "b" * 32
+    assert job["trace_url"] == "http://localhost:3000/trace/" + "b" * 32
 
 
 def test_a_running_job_has_no_report_yet(client: TestClient, crew: FakeCrew) -> None:

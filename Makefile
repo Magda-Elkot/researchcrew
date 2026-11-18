@@ -1,5 +1,5 @@
 # Shortcuts for common tasks. Run `make <target>`.
-.PHONY: install lint format typecheck test check up down ingest docs-mcp api frontend inspect demo-prepare demo-build demo-run demo-tunnel eval
+.PHONY: install lint format typecheck test check up down ingest docs-mcp api frontend langfuse-env langfuse-up langfuse-down inspect demo-prepare demo-build demo-run demo-tunnel eval
 
 install:  ## Install all dependency groups into .venv
 	uv sync --all-groups
@@ -33,10 +33,19 @@ docs-mcp:  ## Run the docs-mcp server locally (http://127.0.0.1:8001/mcp)
 	uv run docs-mcp
 
 api:  ## Run the API locally with reload off, one worker (http://127.0.0.1:8000/docs)
-	uv run uvicorn app.api.main:app --host 127.0.0.1 --port 8000 --workers 1
+	uv run uvicorn app.api.main:app --host 127.0.0.1 --port 8000 --workers 1 --log-config app/api/uvicorn_log.json
 
 frontend:  ## Run the Streamlit page locally (http://localhost:8501; needs the API)
 	uv run streamlit run frontend/streamlit_app.py --server.address=127.0.0.1 --server.headless=true --browser.gatherUsageStats=false
+
+langfuse-env:  ## Add random Langfuse secrets + API keys to .env (only the missing ones; prints names, never values)
+	uv run python scripts/langfuse_env.py .env
+
+langfuse-up:  ## Start self-hosted Langfuse (6 containers, ~2-3 min to be ready; UI http://localhost:3000)
+	docker compose --profile observability up -d langfuse-web langfuse-worker
+
+langfuse-down:  ## Stop Langfuse (keeps its data volumes)
+	docker compose --profile observability stop langfuse-web langfuse-worker langfuse-postgres langfuse-clickhouse langfuse-minio langfuse-redis
 
 inspect:  ## Open the MCP Inspector web UI (connect to http://localhost:8001/mcp, transport HTTP)
 	npx -y @modelcontextprotocol/inspector@2.13.0

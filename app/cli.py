@@ -14,6 +14,7 @@ from app.agents.pipeline import RunResult, run_research
 from app.agents.report import to_markdown
 from app.config import ConfigError, get_settings, require
 from app.log import get_logger
+from app.observability import flush_tracing, setup_tracing, trace_url
 
 logger = get_logger(__name__)
 
@@ -57,11 +58,20 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("configuration error", extra={"error": str(exc)})
         return 2
     settings = get_settings()
-    result = run_research(args.question, args.depth, settings, process=Process(args.process))
+    setup_tracing(settings)
+    try:
+        result = run_research(args.question, args.depth, settings, process=Process(args.process))
+    finally:
+        flush_tracing()  # a short-lived process: send the spans before it exits
     paths = write_outputs(result, Path(settings.outputs_dir))
     logger.info(
         "outputs written",
-        extra={"status": result.status, "files": [str(p) for p in paths], "error": result.error},
+        extra={
+            "status": result.status,
+            "files": [str(p) for p in paths],
+            "error": result.error,
+            "trace_url": trace_url(settings, result.trace_id),
+        },
     )
     return 0 if result.status == "completed" else 1
 

@@ -28,6 +28,7 @@ from app.agents.report import check_citations
 from app.config import Settings
 from app.language import detect_language
 from app.log import get_logger
+from app.observability import traced_run
 from app.schemas import (
     Depth,
     EvidenceItem,
@@ -88,6 +89,8 @@ class RunResult(JobResult):
     # Citation problems left in the final report.
     remaining_issues: list[str] = Field(default_factory=list)
     tool_calls: int = 0
+    # The run's Langfuse trace (None when tracing is off).
+    trace_id: str | None = None
 
 
 @contextmanager
@@ -124,8 +127,50 @@ def run_research(
     job_id: str | None = None,
     open_steps: OpenSteps = open_crew_steps,
 ) -> RunResult:
-    """Run the whole crew for one question. Never raises: errors give a `failed` result."""
+    """Run the whole crew for one question. Never raises: errors give a `failed` result.
+
+    The run is one Langfuse trace when tracing is on (`app.observability`, Phase 5)."""
     job_id = job_id or uuid.uuid4().hex[:12]
+    with traced_run(
+        job_id=job_id,
+        question=question,
+        depth=depth,
+        process=process.value,
+        model=settings.llm_model,
+        version=settings.app_version,
+    ) as trace:
+        result = _run(question, depth, settings, emit, process, job_id, open_steps)
+        result.trace_id = trace.trace_id
+        trace.finish(_trace_output(result), error=result.error)
+    return result
+
+
+def _trace_output(result: RunResult) -> dict[str, object]:
+    """The run's summary shown as the trace's output in Langfuse."""
+    return {
+        "status": result.status,
+        "title": result.report.title if result.report else None,
+        "evidence": len(result.evidence),
+        "evidence_dropped": result.evidence_dropped,
+        "citations": len(result.citations),
+        "revised": result.revised,
+        "remaining_issues": len(result.remaining_issues),
+        "tool_calls": result.tool_calls,
+        "total_tokens": result.token_usage.total_tokens,
+        "cost_usd": result.cost_usd,
+        "latency_s": result.latency_s,
+    }
+
+
+def _run(
+    question: str,
+    depth: Depth,
+    settings: Settings,
+    emit: EmitFn | None,
+    process: Process,
+    job_id: str,
+    open_steps: OpenSteps,
+) -> RunResult:
     limits = LIMITS[depth]
     started = time.monotonic()
     guard = RunGuard(

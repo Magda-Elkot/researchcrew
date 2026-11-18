@@ -21,6 +21,7 @@ from app.agents.report import to_markdown
 from app.api.jobs import TERMINAL_STATUSES, JobRecord, JobStore
 from app.api.runner import FINAL_EVENTS, JobRunner
 from app.config import Settings
+from app.observability import trace_url
 from app.schemas import Depth, JobCreated, JobResult, ResearchRequest
 
 router = APIRouter(prefix="/research", tags=["research"])
@@ -33,6 +34,9 @@ class JobView(JobResult):
     depth: Depth
     created_at: datetime
     report_markdown: str | None = None
+    # The run's Langfuse trace (None when tracing is off).
+    trace_id: str | None = None
+    trace_url: str | None = None
 
 
 def _settings(request: Request) -> Settings:
@@ -74,7 +78,7 @@ def create_job(
 
 
 @router.get("/{job_id}")
-def get_job(job: JobDep) -> JobView:
+def get_job(job: JobDep, request: Request) -> JobView:
     view: dict[str, object] = {
         "job_id": job.id,
         "question": job.question,
@@ -89,6 +93,8 @@ def get_job(job: JobDep) -> JobView:
             view[name] = getattr(result, name)
         if result.report is not None:
             view["report_markdown"] = to_markdown(result.report, rtl_wrapper=False)
+        view["trace_id"] = result.trace_id
+        view["trace_url"] = trace_url(_settings(request), result.trace_id)
     return JobView.model_validate(view)
 
 

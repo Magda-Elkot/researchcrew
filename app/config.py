@@ -95,6 +95,16 @@ class Settings(BaseSettings):
     # Extra seconds after RUN_TIMEOUT_S before a still-running job is marked failed.
     job_timeout_grace_s: int = Field(default=60, ge=0)
 
+    # --- Tracing with self-hosted Langfuse (Phase 5) ---
+    # Both keys set = every run is traced; either missing = tracing off (DECISIONS #92).
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    # Where the app sends traces (compose sets http://langfuse-web:3000 for the api container).
+    langfuse_base_url: str = "http://localhost:3000"
+    # Where *you* open Langfuse in the browser: used for the trace links the API returns.
+    langfuse_ui_url: str = "http://localhost:3000"
+    langfuse_tracing_environment: str = "dev"
+
     @model_validator(mode="after")
     def _overlap_smaller_than_chunk(self) -> Self:
         if self.chunk_overlap >= self.chunk_tokens:
